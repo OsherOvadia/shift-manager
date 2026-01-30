@@ -1,17 +1,5 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
-  "installCommand": "npm install && cp prisma/schema.production.prisma prisma/schema.prisma",
-  "functions": {
-    "dist/serverless.js": {
-      "memory": 1024,
-      "maxDuration": 10
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/dist/serverless.js"
-    }
-  ]
+  "installCommand": "npm install && cp prisma/schema.production.prisma prisma/schema.prisma"
 }
