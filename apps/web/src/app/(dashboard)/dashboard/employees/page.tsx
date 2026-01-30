@@ -51,7 +51,7 @@ export default function EmployeesPage() {
     enabled: !!accessToken,
   })
 
-  const { data: jobCategories } = useQuery({
+  const { data: jobCategories } = useQuery<any[]>({
     queryKey: ['job-categories'],
     queryFn: () => api.get('/job-categories/active', accessToken!),
     enabled: !!accessToken,
