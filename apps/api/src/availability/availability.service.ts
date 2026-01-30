@@ -95,7 +95,7 @@ export class AvailabilityService {
             createMany: {
               data: createDto.slots.map((slot) => ({
                 shiftDate: new Date(slot.shiftDate),
-                shiftType: slot.shiftType,
+                shiftType: slot.shiftType as any,
                 preferenceRank: slot.preferenceRank || 1,
               })),
             },
@@ -121,7 +121,7 @@ export class AvailabilityService {
           createMany: {
             data: createDto.slots.map((slot) => ({
               shiftDate: new Date(slot.shiftDate),
-              shiftType: slot.shiftType,
+              shiftType: slot.shiftType as any,
               preferenceRank: slot.preferenceRank || 1,
             })),
           },
@@ -189,7 +189,7 @@ export class AvailabilityService {
         data: updateDto.slots.map((slot) => ({
           submissionId: id,
           shiftDate: new Date(slot.shiftDate),
-          shiftType: slot.shiftType,
+          shiftType: slot.shiftType as any,
           preferenceRank: slot.preferenceRank || 1,
         })),
       });

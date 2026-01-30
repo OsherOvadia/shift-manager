@@ -107,7 +107,7 @@ export class AssignmentsService {
     }
 
     const updateData: any = {};
-    if (updateDto.status !== undefined) updateData.status = updateDto.status;
+    if (updateDto.status !== undefined) updateData.status = updateDto.status as any;
 
     const updatedAssignment = await this.prisma.shiftAssignment.update({
       where: { id },

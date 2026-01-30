@@ -37,7 +37,7 @@ export class ShiftTemplatesService {
     return this.prisma.shiftTemplate.create({
       data: {
         name: createDto.name,
-        shiftType: createDto.shiftType,
+        shiftType: createDto.shiftType as any,
         startTime: createDto.startTime,
         endTime: createDto.endTime,
         minStaff: createDto.minStaff,
@@ -52,7 +52,7 @@ export class ShiftTemplatesService {
 
     const updateData: any = {};
     if (updateDto.name !== undefined) updateData.name = updateDto.name;
-    if (updateDto.shiftType !== undefined) updateData.shiftType = updateDto.shiftType;
+    if (updateDto.shiftType !== undefined) updateData.shiftType = updateDto.shiftType as any;
     if (updateDto.startTime !== undefined) updateData.startTime = updateDto.startTime;
     if (updateDto.endTime !== undefined) updateData.endTime = updateDto.endTime;
     if (updateDto.minStaff !== undefined) updateData.minStaff = updateDto.minStaff;

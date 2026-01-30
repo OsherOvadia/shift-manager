@@ -70,7 +70,7 @@ export class UsersService {
     };
     if (data?.jobCategoryId) updateData.jobCategoryId = data.jobCategoryId;
     if (data?.hourlyWage !== undefined) updateData.hourlyWage = data.hourlyWage;
-    if (data?.employmentType) updateData.employmentType = data.employmentType;
+    if (data?.employmentType) updateData.employmentType = data.employmentType as any;
 
     return this.prisma.user.update({
       where: { id },
@@ -170,8 +170,8 @@ export class UsersService {
 
     // Employees can only update their own non-sensitive fields
     if (requesterRole !== 'EMPLOYEE') {
-      if (updateUserDto.role !== undefined) updateData.role = updateUserDto.role;
-      if (updateUserDto.employmentType !== undefined) updateData.employmentType = updateUserDto.employmentType;
+      if (updateUserDto.role !== undefined) updateData.role = updateUserDto.role as any;
+      if (updateUserDto.employmentType !== undefined) updateData.employmentType = updateUserDto.employmentType as any;
       if (updateUserDto.isActive !== undefined) updateData.isActive = updateUserDto.isActive;
     }
 

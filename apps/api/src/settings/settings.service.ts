@@ -24,14 +24,14 @@ export class SettingsService {
       // Return with parsed weekendDays for API response
       return {
         ...created,
-        weekendDays: created.weekendDays.split(',').map(d => parseInt(d, 10)),
+        weekendDays: created.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
       };
     }
 
     // Return with parsed weekendDays for API response
     return {
       ...settings,
-      weekendDays: settings.weekendDays.split(',').map(d => parseInt(d, 10)),
+      weekendDays: settings.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
     };
   }
 
@@ -58,7 +58,7 @@ export class SettingsService {
       });
       return {
         ...created,
-        weekendDays: created.weekendDays.split(',').map(d => parseInt(d, 10)),
+        weekendDays: created.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
       };
     }
 
@@ -69,7 +69,7 @@ export class SettingsService {
 
     return {
       ...updated,
-      weekendDays: updated.weekendDays.split(',').map(d => parseInt(d, 10)),
+      weekendDays: updated.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
     };
   }
 }
