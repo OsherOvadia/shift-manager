@@ -161,13 +161,13 @@ export default function SignupPage() {
                 id="organizationName"
                 value={formData.organizationName}
                 onChange={(e) => setFormData({ ...formData, organizationName: e.target.value })}
-                placeholder="לדוגמה: Demo Organization"
+                placeholder="Demo Organization"
               />
               {errors.organizationName && (
                 <p className="text-sm text-destructive">{errors.organizationName}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                הזן את שם הארגון המדויק (קיבלת אותו מהמנהל)
+                💡 לדמו השתמש ב: <span className="font-semibold">Demo Organization</span>
               </p>
             </div>
 
