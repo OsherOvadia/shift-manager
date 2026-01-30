@@ -1,4 +1,4 @@
-import { IsEmail, IsString, IsOptional, MinLength, MaxLength, IsUUID } from 'class-validator';
+import { IsEmail, IsString, MinLength, MaxLength } from 'class-validator';
 
 export class SignupRequestDto {
   @IsEmail({}, { message: 'כתובת אימייל לא תקינה' })
@@ -19,10 +19,8 @@ export class SignupRequestDto {
   @MaxLength(50)
   lastName: string;
 
-  @IsUUID('4', { message: 'מזהה ארגון לא תקין' })
-  organizationId: string;
-
-  @IsUUID('4', { message: 'מזהה קטגוריה לא תקין' })
-  @IsOptional()
-  jobCategoryId?: string;
+  @IsString()
+  @MinLength(2, { message: 'שם הארגון חייב להכיל לפחות 2 תווים' })
+  @MaxLength(100)
+  organizationName: string;
 }

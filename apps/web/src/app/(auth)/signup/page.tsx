@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { z } from 'zod'
@@ -9,13 +9,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import { Calendar, Loader2, CheckCircle } from 'lucide-react'
 
@@ -24,7 +17,7 @@ const signupSchema = z.object({
   lastName: z.string().min(2, 'שם משפחה חייב להכיל לפחות 2 תווים'),
   email: z.string().email('כתובת אימייל לא תקינה'),
   password: z.string().min(8, 'סיסמה חייבת להכיל לפחות 8 תווים'),
-  organizationId: z.string().min(1, 'יש לבחור ארגון'),
+  organizationName: z.string().min(2, 'שם הארגון חייב להכיל לפחות 2 תווים'),
 })
 
 export default function SignupPage() {
@@ -32,35 +25,14 @@ export default function SignupPage() {
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [organizations, setOrganizations] = useState<any[]>([])
-  const [jobCategories, setJobCategories] = useState<any[]>([])
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
     password: '',
-    organizationId: '',
-    jobCategoryId: '',
+    organizationName: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    // Fetch organizations
-    api.get('/auth/organizations')
-      .then((data: any) => setOrganizations(data))
-      .catch(console.error)
-  }, [])
-
-  useEffect(() => {
-    // Fetch job categories when organization is selected
-    if (formData.organizationId) {
-      api.get(`/auth/organizations/${formData.organizationId}/job-categories`)
-        .then((data: any) => setJobCategories(data))
-        .catch(console.error)
-    } else {
-      setJobCategories([])
-    }
-  }, [formData.organizationId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -82,10 +54,7 @@ export default function SignupPage() {
     setIsLoading(true)
 
     try {
-      await api.post('/auth/signup-request', {
-        ...formData,
-        ...(formData.jobCategoryId && { jobCategoryId: formData.jobCategoryId }),
-      })
+      await api.public.post('/auth/signup-request', formData)
       setSuccess(true)
     } catch (error: any) {
       toast({
@@ -187,47 +156,20 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>ארגון</Label>
-              <Select
-                value={formData.organizationId}
-                onValueChange={(value) => setFormData({ ...formData, organizationId: value, jobCategoryId: '' })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="בחר ארגון" />
-                </SelectTrigger>
-                <SelectContent>
-                  {organizations.map((org) => (
-                    <SelectItem key={org.id} value={org.id}>
-                      {org.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.organizationId && (
-                <p className="text-sm text-destructive">{errors.organizationId}</p>
+              <Label htmlFor="organizationName">שם הארגון</Label>
+              <Input
+                id="organizationName"
+                value={formData.organizationName}
+                onChange={(e) => setFormData({ ...formData, organizationName: e.target.value })}
+                placeholder="שם העסק שלך"
+              />
+              {errors.organizationName && (
+                <p className="text-sm text-destructive">{errors.organizationName}</p>
               )}
+              <p className="text-xs text-muted-foreground">
+                הזן את שם הארגון אליו ברצונך להצטרף
+              </p>
             </div>
-
-            {jobCategories.length > 0 && (
-              <div className="space-y-2">
-                <Label>תפקיד (אופציונלי)</Label>
-                <Select
-                  value={formData.jobCategoryId}
-                  onValueChange={(value) => setFormData({ ...formData, jobCategoryId: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="בחר תפקיד" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {jobCategories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.nameHe}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
 
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}

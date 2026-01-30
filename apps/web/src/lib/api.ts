@@ -1,7 +1,10 @@
+import { getAccessToken, refreshAccessToken } from './auth'
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
 
 interface RequestOptions extends RequestInit {
   token?: string
+  skipAuth?: boolean
 }
 
 class ApiError extends Error {
@@ -12,21 +15,37 @@ class ApiError extends Error {
 }
 
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-  const { token, ...fetchOptions } = options
+  const { token, skipAuth, ...fetchOptions } = options
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...options.headers,
   }
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
+  // Auto-attach token from auth store if not provided and not skipped
+  if (!skipAuth) {
+    const authToken = token || getAccessToken()
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`
+    }
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  let response = await fetch(`${API_URL}${endpoint}`, {
     ...fetchOptions,
     headers,
   })
+
+  // If unauthorized, try to refresh token and retry
+  if (response.status === 401 && !skipAuth && !endpoint.includes('/auth/')) {
+    const newToken = await refreshAccessToken()
+    if (newToken) {
+      headers['Authorization'] = `Bearer ${newToken}`
+      response = await fetch(`${API_URL}${endpoint}`, {
+        ...fetchOptions,
+        headers,
+      })
+    }
+  }
 
   const data = await response.json().catch(() => null)
 
@@ -45,10 +64,10 @@ export const api = {
   get: <T>(endpoint: string, token?: string) =>
     request<T>(endpoint, { method: 'GET', token }),
 
-  post: <T>(endpoint: string, body: any, token?: string) =>
+  post: <T>(endpoint: string, body?: any, token?: string) =>
     request<T>(endpoint, {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: body ? JSON.stringify(body) : undefined,
       token,
     }),
 
@@ -61,6 +80,18 @@ export const api = {
 
   delete: <T>(endpoint: string, token?: string) =>
     request<T>(endpoint, { method: 'DELETE', token }),
+
+  // For unauthenticated requests (login, signup, etc.)
+  public: {
+    post: <T>(endpoint: string, body: any) =>
+      request<T>(endpoint, {
+        method: 'POST',
+        body: JSON.stringify(body),
+        skipAuth: true,
+      }),
+    get: <T>(endpoint: string) =>
+      request<T>(endpoint, { method: 'GET', skipAuth: true }),
+  },
 }
 
 export { ApiError }

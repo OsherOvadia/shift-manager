@@ -51,8 +51,7 @@ export class AuthService {
     password: string;
     firstName: string;
     lastName: string;
-    organizationId: string;
-    jobCategoryId?: string;
+    organizationName: string;
   }) {
     const existingUser = await this.prisma.user.findUnique({
       where: { email: signupDto.email },
@@ -62,12 +61,18 @@ export class AuthService {
       throw new ConflictException('כתובת האימייל כבר קיימת במערכת');
     }
 
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: signupDto.organizationId },
+    // Find organization by name (case-insensitive)
+    const organization = await this.prisma.organization.findFirst({
+      where: { 
+        name: {
+          equals: signupDto.organizationName,
+          mode: 'insensitive' as any,
+        }
+      },
     });
 
     if (!organization) {
-      throw new UnauthorizedException('ארגון לא נמצא');
+      throw new UnauthorizedException('ארגון לא נמצא. אנא בדוק את שם הארגון ונסה שוב.');
     }
 
     const passwordHash = await bcrypt.hash(signupDto.password, 12);
@@ -78,13 +83,35 @@ export class AuthService {
         passwordHash,
         firstName: signupDto.firstName,
         lastName: signupDto.lastName,
-        role: 'EMPLOYEE',
-        employmentType: 'FULL_TIME',
-        organizationId: signupDto.organizationId,
-        jobCategoryId: signupDto.jobCategoryId,
+        role: 'EMPLOYEE' as any,
+        employmentType: 'FULL_TIME' as any,
+        organizationId: organization.id,
         isApproved: false, // Requires admin approval
       },
     });
+
+    // Notify all admins of the new signup request
+    const admins = await this.prisma.user.findMany({
+      where: {
+        organizationId: organization.id,
+        role: 'ADMIN',
+        isActive: true,
+      },
+    });
+
+    // Create notifications for all admins
+    await Promise.all(
+      admins.map((admin) =>
+        this.prisma.notification.create({
+          data: {
+            userId: admin.id,
+            title: 'בקשת הרשמה חדשה',
+            message: `${signupDto.firstName} ${signupDto.lastName} ביקש להצטרף לארגון`,
+            type: 'RULE_VIOLATION' as any, // Using RULE_VIOLATION as general notification type
+          },
+        })
+      )
+    );
 
     return {
       message: 'בקשת ההרשמה נשלחה בהצלחה. ממתין לאישור מנהל.',
