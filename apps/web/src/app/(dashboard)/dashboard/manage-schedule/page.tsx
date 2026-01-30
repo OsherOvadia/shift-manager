@@ -34,8 +34,6 @@ export default function ManageSchedulePage() {
   const { accessToken } = useAuthStore()
   
   const [weekOffset, setWeekOffset] = useState(0)
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('')
-  const [selectedShiftTemplate, setSelectedShiftTemplate] = useState<string>('')
   const [weekendDays, setWeekendDays] = useState<number[]>([4, 5, 6]) // Thu, Fri, Sat
 
   // Parse week from URL or use current week
@@ -77,6 +75,13 @@ export default function ManageSchedulePage() {
   const { data: schedules, isLoading: schedulesLoading } = useQuery({
     queryKey: ['schedules'],
     queryFn: () => api.get<any[]>('/schedules', accessToken!),
+    enabled: !!accessToken,
+  })
+
+  // Fetch availability submissions for the week
+  const { data: availabilitySubmissions } = useQuery({
+    queryKey: ['availability-submissions', targetWeekStart.toISOString()],
+    queryFn: () => api.get<any[]>(`/availability/week/${targetWeekStart.toISOString()}/all`, accessToken!),
     enabled: !!accessToken,
   })
 
@@ -206,26 +211,68 @@ export default function ManageSchedulePage() {
     })
   }
 
-  const handleAddAssignment = (date: Date, shiftType: string) => {
-    if (!currentSchedule || !selectedEmployee || !selectedShiftTemplate) {
-      toast({
-        variant: 'destructive',
-        title: 'שגיאה',
-        description: 'יש לבחור עובד ומשמרת',
-      })
-      return
-    }
+  const handleAddAssignment = (userId: string, date: Date, shiftType: string) => {
+    if (!currentSchedule) return
+
+    const template = getShiftTemplateByType(shiftType)
+    if (!template) return
 
     createAssignmentMutation.mutate({
       scheduleId: currentSchedule.id,
-      userId: selectedEmployee,
-      shiftTemplateId: selectedShiftTemplate,
+      userId,
+      shiftTemplateId: template.id,
       shiftDate: date.toISOString(),
     })
   }
 
   const getShiftTemplateByType = (shiftType: string) => {
     return shiftTemplates?.find((t) => t.shiftType === shiftType)
+  }
+
+  // Get employees sorted by availability for a specific date/shift
+  const getEmployeesForShift = (date: Date, shiftType: string) => {
+    if (!employees) return []
+    
+    const dateStr = date.toISOString().split('T')[0]
+    
+    // Find employees who submitted availability for this specific shift
+    const employeesWithAvailability: string[] = []
+    availabilitySubmissions?.forEach((submission: any) => {
+      submission.slots?.forEach((slot: any) => {
+        const slotDate = new Date(slot.shiftDate).toISOString().split('T')[0]
+        if (slotDate === dateStr && slot.shiftType === shiftType) {
+          employeesWithAvailability.push(submission.userId)
+        }
+      })
+    })
+
+    // Sort: employees with availability first, then others
+    return [...employees].sort((a, b) => {
+      const aHasAvailability = employeesWithAvailability.includes(a.id)
+      const bHasAvailability = employeesWithAvailability.includes(b.id)
+      
+      if (aHasAvailability && !bHasAvailability) return -1
+      if (!aHasAvailability && bHasAvailability) return 1
+      
+      // If both have or both don't have availability, sort alphabetically
+      return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, 'he')
+    })
+  }
+
+  // Check if an employee submitted availability for a specific shift
+  const hasAvailability = (userId: string, date: Date, shiftType: string) => {
+    if (!availabilitySubmissions) return false
+    
+    const dateStr = date.toISOString().split('T')[0]
+    
+    return availabilitySubmissions.some((submission: any) => {
+      if (submission.userId !== userId) return false
+      
+      return submission.slots?.some((slot: any) => {
+        const slotDate = new Date(slot.shiftDate).toISOString().split('T')[0]
+        return slotDate === dateStr && slot.shiftType === shiftType
+      })
+    })
   }
 
   return (
@@ -318,46 +365,6 @@ export default function ManageSchedulePage() {
         </Card>
       )}
 
-      {/* Assignment Controls */}
-      {currentSchedule && currentSchedule.status === 'DRAFT' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">הוסף שיבוץ</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4 flex-wrap">
-              <div className="flex-1 min-w-[200px]">
-                <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="בחר עובד" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employees?.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id}>
-                        {emp.firstName} {emp.lastName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <Select value={selectedShiftTemplate} onValueChange={setSelectedShiftTemplate}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="בחר משמרת" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {shiftTemplates?.map((template) => (
-                      <SelectItem key={template.id} value={template.id}>
-                        {template.name} ({template.startTime} - {template.endTime})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Schedule Grid */}
       {isLoading ? (
@@ -405,7 +412,7 @@ export default function ManageSchedulePage() {
                               isWeekend(date, weekendDays) && 'bg-blue-100 dark:bg-blue-950'
                             )}
                           >
-                            <div className="space-y-1">
+                            <div className="space-y-1 min-w-[180px]">
                               {assignments.map((a: any) => (
                                 <div
                                   key={a.id}
@@ -426,20 +433,31 @@ export default function ManageSchedulePage() {
                                   )}
                                 </div>
                               ))}
-                              {currentSchedule.status === 'DRAFT' &&
-                                selectedEmployee &&
-                                selectedShiftTemplate &&
-                                template?.id === selectedShiftTemplate && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="w-full"
-                                    onClick={() => handleAddAssignment(date, shift.value)}
-                                    disabled={createAssignmentMutation.isPending}
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                )}
+                              {currentSchedule.status === 'DRAFT' && template && (
+                                <Select
+                                  value=""
+                                  onValueChange={(userId) => handleAddAssignment(userId, date, shift.value)}
+                                >
+                                  <SelectTrigger className="w-full h-8 text-xs">
+                                    <SelectValue placeholder="+ הוסף עובד" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {getEmployeesForShift(date, shift.value).map((emp) => {
+                                      const hasAvail = hasAvailability(emp.id, date, shift.value)
+                                      return (
+                                        <SelectItem key={emp.id} value={emp.id}>
+                                          <div className="flex items-center gap-2">
+                                            <span>{emp.firstName} {emp.lastName}</span>
+                                            {hasAvail && (
+                                              <span className="text-xs text-green-600 dark:text-green-400">✓</span>
+                                            )}
+                                          </div>
+                                        </SelectItem>
+                                      )
+                                    })}
+                                  </SelectContent>
+                                </Select>
+                              )}
                             </div>
                           </td>
                         )

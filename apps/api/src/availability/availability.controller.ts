@@ -19,6 +19,13 @@ export class AvailabilityController {
     return this.availabilityService.getWeekAvailability(req.user.sub, new Date(date));
   }
 
+  @Get('week/:date/all')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'MANAGER')
+  async getAllWeekAvailability(@Param('date') date: string, @Request() req: any) {
+    return this.availabilityService.getAllSubmissions(req.user.organizationId, new Date(date));
+  }
+
   @Post()
   async submitAvailability(@Body() createDto: CreateAvailabilityDto, @Request() req: any) {
     return this.availabilityService.submitAvailability(req.user.sub, createDto);
