@@ -501,53 +501,122 @@ export default function ManageSchedulePage() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="flex-1 overflow-y-auto py-4 space-y-2">
-            {selectedShift &&
-              getEmployeesForShift(selectedShift.date, selectedShift.shiftType).map((emp) => {
-                const hasAvail = hasAvailability(emp.id, selectedShift.date, selectedShift.shiftType)
-                const isAssigned = scheduleDetails?.shiftAssignments?.some(
-                  (a: any) =>
-                    a.userId === emp.id &&
-                    new Date(a.shiftDate).toISOString().split('T')[0] ===
-                      selectedShift.date.toISOString().split('T')[0] &&
-                    a.shiftTemplate.shiftType === selectedShift.shiftType
-                )
-                
-                return (
-                  <div
-                    key={emp.id}
-                    className={cn(
-                      'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
-                      selectedWorkers.includes(emp.id)
-                        ? 'bg-primary/10 border-primary'
-                        : 'hover:bg-muted',
-                      isAssigned && 'opacity-50'
-                    )}
-                    onClick={() => !isAssigned && toggleWorker(emp.id)}
-                  >
-                    <Checkbox
-                      checked={selectedWorkers.includes(emp.id)}
-                      disabled={isAssigned}
-                      onCheckedChange={() => toggleWorker(emp.id)}
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">
-                          {emp.firstName} {emp.lastName}
-                        </span>
-                        {hasAvail && (
-                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">
-                            ✓ ביקש משמרת
-                          </Badge>
-                        )}
+          <div className="flex-1 overflow-y-auto py-4">
+            {/* Workers who submitted availability */}
+            {selectedShift && (() => {
+              const sortedEmployees = getEmployeesForShift(selectedShift.date, selectedShift.shiftType)
+              const withAvailability = sortedEmployees.filter((emp) => 
+                hasAvailability(emp.id, selectedShift.date, selectedShift.shiftType)
+              )
+              const withoutAvailability = sortedEmployees.filter((emp) => 
+                !hasAvailability(emp.id, selectedShift.date, selectedShift.shiftType)
+              )
+
+              return (
+                <>
+                  {withAvailability.length > 0 && (
+                    <>
+                      <div className="px-3 pb-2 text-xs font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
+                        <span className="text-base">✓</span>
+                        ביקשו משמרת זו ({withAvailability.length})
                       </div>
-                      {isAssigned && (
-                        <span className="text-xs text-muted-foreground">כבר משובץ</span>
+                      <div className="space-y-2 mb-4">
+                        {withAvailability.map((emp) => {
+                          const isAssigned = scheduleDetails?.shiftAssignments?.some(
+                            (a: any) =>
+                              a.userId === emp.id &&
+                              new Date(a.shiftDate).toISOString().split('T')[0] ===
+                                selectedShift.date.toISOString().split('T')[0] &&
+                              a.shiftTemplate.shiftType === selectedShift.shiftType
+                          )
+                          
+                          return (
+                            <div
+                              key={emp.id}
+                              className={cn(
+                                'flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all',
+                                selectedWorkers.includes(emp.id)
+                                  ? 'bg-green-50 dark:bg-green-950 border-green-500 shadow-sm'
+                                  : 'bg-green-50/50 dark:bg-green-950/30 border-green-300 dark:border-green-800 hover:border-green-400 dark:hover:border-green-700',
+                                isAssigned && 'opacity-50 cursor-not-allowed'
+                              )}
+                              onClick={() => !isAssigned && toggleWorker(emp.id)}
+                            >
+                              <Checkbox
+                                checked={selectedWorkers.includes(emp.id)}
+                                disabled={isAssigned}
+                                onCheckedChange={() => toggleWorker(emp.id)}
+                                className="border-green-600"
+                              />
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold text-green-900 dark:text-green-100">
+                                    {emp.firstName} {emp.lastName}
+                                  </span>
+                                  <span className="text-xs text-green-600 dark:text-green-400">✓</span>
+                                </div>
+                                {isAssigned && (
+                                  <span className="text-xs text-muted-foreground">כבר משובץ</span>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )}
+
+                  {withoutAvailability.length > 0 && (
+                    <>
+                      {withAvailability.length > 0 && (
+                        <div className="px-3 py-2 text-xs font-semibold text-muted-foreground border-t">
+                          עובדים נוספים ({withoutAvailability.length})
+                        </div>
                       )}
-                    </div>
-                  </div>
-                )
-              })}
+                      <div className="space-y-2">
+                        {withoutAvailability.map((emp) => {
+                          const isAssigned = scheduleDetails?.shiftAssignments?.some(
+                            (a: any) =>
+                              a.userId === emp.id &&
+                              new Date(a.shiftDate).toISOString().split('T')[0] ===
+                                selectedShift.date.toISOString().split('T')[0] &&
+                              a.shiftTemplate.shiftType === selectedShift.shiftType
+                          )
+                          
+                          return (
+                            <div
+                              key={emp.id}
+                              className={cn(
+                                'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                                selectedWorkers.includes(emp.id)
+                                  ? 'bg-primary/10 border-primary'
+                                  : 'hover:bg-muted',
+                                isAssigned && 'opacity-50 cursor-not-allowed'
+                              )}
+                              onClick={() => !isAssigned && toggleWorker(emp.id)}
+                            >
+                              <Checkbox
+                                checked={selectedWorkers.includes(emp.id)}
+                                disabled={isAssigned}
+                                onCheckedChange={() => toggleWorker(emp.id)}
+                              />
+                              <div className="flex-1">
+                                <span className="font-medium">
+                                  {emp.firstName} {emp.lastName}
+                                </span>
+                                {isAssigned && (
+                                  <div className="text-xs text-muted-foreground">כבר משובץ</div>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )}
+                </>
+              )
+            })()}
           </div>
 
           <DialogFooter className="gap-2">
