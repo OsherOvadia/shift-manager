@@ -51,7 +51,7 @@ export class NotificationsService {
         userId,
         title,
         message,
-        type,
+        type: type as any,
       },
     });
   }

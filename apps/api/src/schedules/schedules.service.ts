@@ -85,7 +85,7 @@ export class SchedulesService {
         organizationId,
         weekStartDate,
         createdById: userId,
-        status: 'DRAFT',
+        status: 'DRAFT' as any,
       },
       include: {
         createdBy: {
@@ -111,7 +111,7 @@ export class SchedulesService {
 
     return this.prisma.weeklySchedule.update({
       where: { id },
-      data: { status },
+      data: { status: status as any },
     });
   }
 
@@ -150,7 +150,7 @@ export class SchedulesService {
     const updatedSchedule = await this.prisma.weeklySchedule.update({
       where: { id },
       data: {
-        status: 'PUBLISHED',
+        status: 'PUBLISHED' as any,
         publishedAt: new Date(),
       },
     });

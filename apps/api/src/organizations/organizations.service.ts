@@ -11,15 +11,17 @@ export class OrganizationsService {
     const { name, adminEmail, adminPassword, adminFirstName, adminLastName } = createOrganizationDto;
 
     // Create organization with admin user and default settings
+    const isPostgres = process.env.DATABASE_URL?.includes('postgres');
+    
     const organization = await this.prisma.organization.create({
       data: {
         name,
         businessSettings: {
           create: {
-            weekendDays: '5,6', // Friday, Saturday (comma-separated for SQLite)
+            weekendDays: isPostgres ? [5, 6] : '5,6', // Friday, Saturday
             submissionDeadlineDay: 4, // Thursday
             submissionDeadlineHour: 18,
-          },
+          } as any,
         },
         users: {
           create: {
@@ -27,8 +29,8 @@ export class OrganizationsService {
             passwordHash: await bcrypt.hash(adminPassword, 12),
             firstName: adminFirstName,
             lastName: adminLastName,
-            role: 'ADMIN',
-            employmentType: 'FULL_TIME',
+            role: 'ADMIN' as any,
+            employmentType: 'FULL_TIME' as any,
             isApproved: true, // Admin is auto-approved
           },
         },
@@ -37,7 +39,7 @@ export class OrganizationsService {
             data: [
               {
                 name: 'משמרת בוקר',
-                shiftType: 'MORNING',
+                shiftType: 'MORNING' as any,
                 startTime: '07:00',
                 endTime: '15:00',
                 minStaff: 2,
@@ -45,7 +47,7 @@ export class OrganizationsService {
               },
               {
                 name: 'משמרת ערב',
-                shiftType: 'EVENING',
+                shiftType: 'EVENING' as any,
                 startTime: '15:00',
                 endTime: '23:00',
                 minStaff: 2,
@@ -53,7 +55,7 @@ export class OrganizationsService {
               },
               {
                 name: 'משמרת ערב + סגירה',
-                shiftType: 'EVENING_CLOSE',
+                shiftType: 'EVENING_CLOSE' as any,
                 startTime: '15:00',
                 endTime: '01:00',
                 minStaff: 1,
