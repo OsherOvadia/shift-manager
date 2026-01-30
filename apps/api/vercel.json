@@ -1,4 +1,16 @@
 {
   "version": 2,
-  "buildCommand": "cp prisma/schema.production.prisma prisma/schema.prisma && npm run build"
+  "buildCommand": "cp prisma/schema.production.prisma prisma/schema.prisma && npm run build",
+  "builds": [
+    {
+      "src": "api/index.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.ts"
+    }
+  ]
 }
