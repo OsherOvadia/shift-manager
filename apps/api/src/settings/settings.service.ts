@@ -29,7 +29,7 @@ export class SettingsService {
         ...created,
         weekendDays: Array.isArray(created.weekendDays) 
           ? created.weekendDays 
-          : created.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
+          : (created.weekendDays as any).split(',').map((d: string) => parseInt(d, 10)),
       };
     }
 
@@ -38,7 +38,7 @@ export class SettingsService {
       ...settings,
       weekendDays: Array.isArray(settings.weekendDays) 
         ? settings.weekendDays 
-        : settings.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
+        : (settings.weekendDays as any).split(',').map((d: string) => parseInt(d, 10)),
     };
   }
 
@@ -77,7 +77,7 @@ export class SettingsService {
         ...created,
         weekendDays: Array.isArray(created.weekendDays) 
           ? created.weekendDays 
-          : created.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
+          : (created.weekendDays as any).split(',').map((d: string) => parseInt(d, 10)),
       };
     }
 
@@ -90,7 +90,7 @@ export class SettingsService {
       ...updated,
       weekendDays: Array.isArray(updated.weekendDays) 
         ? updated.weekendDays 
-        : updated.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
+        : (updated.weekendDays as any).split(',').map((d: string) => parseInt(d, 10)),
     };
   }
 }
