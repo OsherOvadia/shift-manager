@@ -159,16 +159,23 @@ export class UsersService {
       throw new ForbiddenException('אין לך הרשאה לעדכן משתמש זה');
     }
 
+    // Build update data object
+    const updateData: any = {};
+    if (updateUserDto.firstName !== undefined) updateData.firstName = updateUserDto.firstName;
+    if (updateUserDto.lastName !== undefined) updateData.lastName = updateUserDto.lastName;
+    if (updateUserDto.jobCategoryId !== undefined) updateData.jobCategoryId = updateUserDto.jobCategoryId;
+    if (updateUserDto.hourlyWage !== undefined) updateData.hourlyWage = updateUserDto.hourlyWage;
+
     // Employees can only update their own non-sensitive fields
-    if (requesterRole === 'EMPLOYEE') {
-      delete updateUserDto.role;
-      delete updateUserDto.employmentType;
-      delete updateUserDto.isActive;
+    if (requesterRole !== 'EMPLOYEE') {
+      if (updateUserDto.role !== undefined) updateData.role = updateUserDto.role;
+      if (updateUserDto.employmentType !== undefined) updateData.employmentType = updateUserDto.employmentType;
+      if (updateUserDto.isActive !== undefined) updateData.isActive = updateUserDto.isActive;
     }
 
     const updatedUser = await this.prisma.user.update({
       where: { id },
-      data: updateUserDto,
+      data: updateData,
       select: {
         id: true,
         email: true,
@@ -176,8 +183,17 @@ export class UsersService {
         lastName: true,
         role: true,
         employmentType: true,
+        hourlyWage: true,
         isActive: true,
         createdAt: true,
+        jobCategory: {
+          select: {
+            id: true,
+            name: true,
+            nameHe: true,
+            color: true,
+          },
+        },
       },
     });
 
