@@ -51,16 +51,18 @@ export default function DashboardLayout({
 }) {
   const router = useRouter()
   const pathname = usePathname()
-  const { user, isAuthenticated, logout } = useAuthStore()
+  const { user, isAuthenticated, logout, _hasHydrated } = useAuthStore()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    // Only check auth after hydration is complete
+    if (_hasHydrated && !isAuthenticated) {
       router.push('/login')
     }
-  }, [isAuthenticated, router])
+  }, [_hasHydrated, isAuthenticated, router])
 
-  if (!isAuthenticated || !user) {
+  // Show nothing while waiting for hydration
+  if (!_hasHydrated || !isAuthenticated || !user) {
     return null
   }
 

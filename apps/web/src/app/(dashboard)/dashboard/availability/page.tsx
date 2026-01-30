@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/ui/use-toast'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
-import { getWeekStartDate, getWeekDates, getDayName, formatShortDate, isWeekend } from '@/lib/utils'
+import { getWeekStartDate, getWeekDates, getDayName, formatShortDate, isWeekend, formatDateLocal, parseLocalDate } from '@/lib/utils'
 import { Loader2, ChevronRight, ChevronLeft, Save, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -114,7 +114,7 @@ export default function AvailabilityPage() {
   })
 
   const toggleSlot = (date: Date, shiftType: string) => {
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = formatDateLocal(date) // Use local date format
     const key = `${dateStr}_${shiftType}`
     
     setSelectedSlots((prev) => {
@@ -133,7 +133,7 @@ export default function AvailabilityPage() {
   }
 
   const isSlotSelected = (date: Date, shiftType: string) => {
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = formatDateLocal(date) // Use local date format
     const key = `${dateStr}_${shiftType}`
     return selectedSlots.has(key)
   }
@@ -152,7 +152,7 @@ export default function AvailabilityPage() {
   }
 
   const weekendSlots = Array.from(selectedSlots.values()).filter((slot) => {
-    const date = new Date(slot.shiftDate)
+    const date = parseLocalDate(slot.shiftDate) // Parse as local date
     const dayOfWeek = date.getDay()
     const isWeekendDay = isWeekend(date, weekendDays)
     console.log('🗓️ Slot date:', slot.shiftDate, 'Day:', dayOfWeek, 'Is weekend?', isWeekendDay, 'Weekend days:', weekendDays)

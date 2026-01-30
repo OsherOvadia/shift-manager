@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -28,8 +28,15 @@ type LoginFormData = z.infer<typeof loginSchema>
 export default function LoginPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const { setAuth } = useAuthStore()
+  const { setAuth, isAuthenticated, _hasHydrated } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (_hasHydrated && isAuthenticated) {
+      router.push('/dashboard')
+    }
+  }, [_hasHydrated, isAuthenticated, router])
 
   const {
     register,
