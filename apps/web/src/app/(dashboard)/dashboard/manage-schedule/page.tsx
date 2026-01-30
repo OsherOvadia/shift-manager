@@ -83,8 +83,22 @@ export default function ManageSchedulePage() {
   // Find or create schedule for current week
   const currentSchedule = schedules?.find((s) => {
     const scheduleDate = new Date(s.weekStartDate)
-    return scheduleDate.getTime() === targetWeekStart.getTime()
+    const targetDate = new Date(targetWeekStart)
+    
+    // Normalize both dates to midnight for comparison
+    scheduleDate.setHours(0, 0, 0, 0)
+    targetDate.setHours(0, 0, 0, 0)
+    
+    const match = scheduleDate.getTime() === targetDate.getTime()
+    console.log('🗓️ Schedule comparison:', {
+      scheduleDate: scheduleDate.toISOString().split('T')[0],
+      targetDate: targetDate.toISOString().split('T')[0],
+      match
+    })
+    return match
   })
+
+  console.log('📋 Current schedule found:', currentSchedule ? 'YES' : 'NO', currentSchedule?.id)
 
   // Fetch schedule details
   const { data: scheduleDetails, isLoading: detailsLoading } = useQuery({
@@ -104,14 +118,16 @@ export default function ManageSchedulePage() {
         description: 'כעת תוכל להוסיף משמרות',
       })
     },
-    onError: (error: any) => {
+    onError: async (error: any) => {
       // If schedule already exists, just refresh the data
       if (error.message?.includes('כבר קיים')) {
+        console.log('⚠️ Schedule already exists, refreshing data...')
         toast({
           title: 'לוח משמרות כבר קיים',
           description: 'טוען את הלוח הקיים...',
         })
-        queryClient.invalidateQueries({ queryKey: ['schedules'] })
+        // Force immediate refetch of schedules
+        await queryClient.refetchQueries({ queryKey: ['schedules'] })
       } else {
         toast({
           variant: 'destructive',

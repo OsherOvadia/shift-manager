@@ -48,9 +48,15 @@ export default function AvailabilityPage() {
   // Update weekend days when settings are loaded
   useEffect(() => {
     if (settings?.weekendDays) {
+      console.log('📅 Loaded weekend days from settings:', settings.weekendDays)
       setWeekendDays(settings.weekendDays)
     }
   }, [settings])
+
+  // Debug: Log current weekend days
+  useEffect(() => {
+    console.log('🔍 Current weekendDays state:', weekendDays)
+  }, [weekendDays])
 
   const { data: existingSubmission, isLoading } = useQuery({
     queryKey: ['availability', targetWeekStart.toISOString()],
@@ -147,7 +153,10 @@ export default function AvailabilityPage() {
 
   const weekendSlots = Array.from(selectedSlots.values()).filter((slot) => {
     const date = new Date(slot.shiftDate)
-    return isWeekend(date, weekendDays)
+    const dayOfWeek = date.getDay()
+    const isWeekendDay = isWeekend(date, weekendDays)
+    console.log('🗓️ Slot date:', slot.shiftDate, 'Day:', dayOfWeek, 'Is weekend?', isWeekendDay, 'Weekend days:', weekendDays)
+    return isWeekendDay
   }).length
 
   const isValid = selectedSlots.size >= getMinShifts() && weekendSlots >= getMinWeekendShifts()
