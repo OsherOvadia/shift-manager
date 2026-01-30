@@ -1,0 +1,239 @@
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { UpdateUserDto } from './dto/update-user.dto';
+
+@Injectable()
+export class UsersService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findAll(organizationId: string) {
+    const users = await this.prisma.user.findMany({
+      where: { organizationId, isApproved: true },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        employmentType: true,
+        hourlyWage: true,
+        isActive: true,
+        isApproved: true,
+        createdAt: true,
+        jobCategory: {
+          select: {
+            id: true,
+            name: true,
+            nameHe: true,
+            color: true,
+          },
+        },
+      },
+      orderBy: { lastName: 'asc' },
+    });
+
+    return users;
+  }
+
+  async findPendingUsers(organizationId: string) {
+    return this.prisma.user.findMany({
+      where: { organizationId, isApproved: false },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        createdAt: true,
+        jobCategory: {
+          select: {
+            id: true,
+            name: true,
+            nameHe: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async approveUser(id: string, organizationId: string, data?: { jobCategoryId?: string; hourlyWage?: number; employmentType?: string }) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, organizationId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('המשתמש לא נמצא');
+    }
+
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        isApproved: true,
+        ...(data?.jobCategoryId && { jobCategoryId: data.jobCategoryId }),
+        ...(data?.hourlyWage !== undefined && { hourlyWage: data.hourlyWage }),
+        ...(data?.employmentType && { employmentType: data.employmentType }),
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        employmentType: true,
+        isApproved: true,
+      },
+    });
+  }
+
+  async rejectUser(id: string, organizationId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, organizationId, isApproved: false },
+    });
+
+    if (!user) {
+      throw new NotFoundException('המשתמש לא נמצא');
+    }
+
+    await this.prisma.user.delete({
+      where: { id },
+    });
+
+    return { message: 'הבקשה נדחתה והמשתמש נמחק' };
+  }
+
+  async findOne(id: string, organizationId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, organizationId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        employmentType: true,
+        hourlyWage: true,
+        isActive: true,
+        isApproved: true,
+        createdAt: true,
+        organization: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        jobCategory: {
+          select: {
+            id: true,
+            name: true,
+            nameHe: true,
+            color: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('המשתמש לא נמצא');
+    }
+
+    return user;
+  }
+
+  async findByEmail(email: string) {
+    return this.prisma.user.findUnique({
+      where: { email },
+    });
+  }
+
+  async update(id: string, updateUserDto: UpdateUserDto, requesterId: string, requesterRole: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!user) {
+      throw new NotFoundException('המשתמש לא נמצא');
+    }
+
+    // Only admins and managers can update other users
+    if (id !== requesterId && requesterRole === 'EMPLOYEE') {
+      throw new ForbiddenException('אין לך הרשאה לעדכן משתמש זה');
+    }
+
+    // Employees can only update their own non-sensitive fields
+    if (requesterRole === 'EMPLOYEE') {
+      delete updateUserDto.role;
+      delete updateUserDto.employmentType;
+      delete updateUserDto.isActive;
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id },
+      data: updateUserDto,
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        employmentType: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+
+    return updatedUser;
+  }
+
+  async deactivate(id: string, requesterId: string, requesterRole: string, organizationId: string) {
+    if (requesterRole !== 'ADMIN' && requesterRole !== 'MANAGER') {
+      throw new ForbiddenException('אין לך הרשאה לבטל משתמש');
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { id, organizationId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('המשתמש לא נמצא');
+    }
+
+    if (id === requesterId) {
+      throw new ForbiddenException('לא ניתן לבטל את עצמך');
+    }
+
+    await this.prisma.user.update({
+      where: { id },
+      data: { isActive: false },
+    });
+
+    return { message: 'המשתמש בוטל בהצלחה' };
+  }
+
+  async getActiveEmployees(organizationId: string) {
+    return this.prisma.user.findMany({
+      where: {
+        organizationId,
+        isActive: true,
+        isApproved: true,
+        role: 'EMPLOYEE',
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        employmentType: true,
+        hourlyWage: true,
+        jobCategory: {
+          select: {
+            id: true,
+            name: true,
+            nameHe: true,
+            color: true,
+          },
+        },
+      },
+      orderBy: { lastName: 'asc' },
+    });
+  }
+}
