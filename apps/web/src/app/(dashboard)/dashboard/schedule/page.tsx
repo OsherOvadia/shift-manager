@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,11 +22,26 @@ export default function SchedulePage() {
   const { accessToken, user } = useAuthStore()
   const isManagerRole = isManager()
   const [weekOffset, setWeekOffset] = useState(0)
+  const [weekendDays, setWeekendDays] = useState<number[]>([4, 5, 6]) // Thu, Fri, Sat
 
   const currentWeekStart = getWeekStartDate(new Date())
   const targetWeekStart = new Date(currentWeekStart)
   targetWeekStart.setDate(targetWeekStart.getDate() + weekOffset * 7)
   const weekDates = getWeekDates(targetWeekStart)
+
+  // Fetch business settings to get actual weekend days
+  const { data: settings } = useQuery({
+    queryKey: ['business-settings'],
+    queryFn: () => api.get<any>('/settings', accessToken!),
+    enabled: !!accessToken,
+  })
+
+  // Update weekend days when settings are loaded
+  useEffect(() => {
+    if (settings?.weekendDays) {
+      setWeekendDays(settings.weekendDays)
+    }
+  }, [settings])
 
   const { data: schedules, isLoading: schedulesLoading } = useQuery({
     queryKey: ['schedules'],
@@ -166,7 +181,7 @@ export default function SchedulePage() {
                         key={date.toISOString()}
                         className={cn(
                           'p-4 text-center font-medium min-w-[140px]',
-                          isWeekend(date) && 'bg-blue-50'
+                          isWeekend(date, weekendDays) && 'bg-blue-100 dark:bg-blue-950'
                         )}
                       >
                         <div>{getDayName(date)}</div>
@@ -190,7 +205,7 @@ export default function SchedulePage() {
                             key={date.toISOString()}
                             className={cn(
                               'p-4 text-center align-top',
-                              isWeekend(date) && 'bg-blue-50'
+                              isWeekend(date, weekendDays) && 'bg-blue-100 dark:bg-blue-950'
                             )}
                           >
                             {assignments.length > 0 ? (

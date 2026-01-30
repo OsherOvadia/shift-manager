@@ -63,8 +63,8 @@ export default function SettingsPage() {
 
   const { register, handleSubmit, setValue, watch, reset } = useForm<SettingsFormData>({
     defaultValues: {
-      weekendDays: [5, 6],
-      submissionDeadlineDay: 4,
+      weekendDays: [4, 5, 6],
+      submissionDeadlineDay: 3,
       submissionDeadlineHour: 18,
     },
   })
@@ -74,8 +74,8 @@ export default function SettingsPage() {
   useEffect(() => {
     if (settings) {
       reset({
-        weekendDays: settings.weekendDays || [5, 6],
-        submissionDeadlineDay: settings.submissionDeadlineDay ?? 4,
+        weekendDays: settings.weekendDays || [4, 5, 6],
+        submissionDeadlineDay: settings.submissionDeadlineDay ?? 3,
         submissionDeadlineHour: settings.submissionDeadlineHour ?? 18,
       })
     }

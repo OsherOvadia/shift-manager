@@ -36,6 +36,7 @@ export default function ManageSchedulePage() {
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedEmployee, setSelectedEmployee] = useState<string>('')
   const [selectedShiftTemplate, setSelectedShiftTemplate] = useState<string>('')
+  const [weekendDays, setWeekendDays] = useState<number[]>([4, 5, 6]) // Thu, Fri, Sat
 
   // Parse week from URL or use current week
   const urlWeek = searchParams.get('week')
@@ -43,6 +44,20 @@ export default function ManageSchedulePage() {
   const targetWeekStart = new Date(currentWeekStart)
   targetWeekStart.setDate(targetWeekStart.getDate() + weekOffset * 7)
   const weekDates = getWeekDates(targetWeekStart)
+
+  // Fetch business settings to get actual weekend days
+  const { data: settings } = useQuery({
+    queryKey: ['business-settings'],
+    queryFn: () => api.get<any>('/settings', accessToken!),
+    enabled: !!accessToken,
+  })
+
+  // Update weekend days when settings are loaded
+  useEffect(() => {
+    if (settings?.weekendDays) {
+      setWeekendDays(settings.weekendDays)
+    }
+  }, [settings])
 
   // Fetch employees
   const { data: employees } = useQuery({
@@ -84,13 +99,26 @@ export default function ManageSchedulePage() {
       api.post('/schedules', { weekStartDate: targetWeekStart.toISOString() }, accessToken!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schedules'] })
+      toast({
+        title: 'לוח משמרות נוצר בהצלחה',
+        description: 'כעת תוכל להוסיף משמרות',
+      })
     },
     onError: (error: any) => {
-      toast({
-        variant: 'destructive',
-        title: 'שגיאה',
-        description: error.message,
-      })
+      // If schedule already exists, just refresh the data
+      if (error.message?.includes('כבר קיים')) {
+        toast({
+          title: 'לוח משמרות כבר קיים',
+          description: 'טוען את הלוח הקיים...',
+        })
+        queryClient.invalidateQueries({ queryKey: ['schedules'] })
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'שגיאה',
+          description: error.message,
+        })
+      }
     },
   })
 
@@ -333,7 +361,7 @@ export default function ManageSchedulePage() {
                         key={date.toISOString()}
                         className={cn(
                           'p-4 text-center font-medium min-w-[160px]',
-                          isWeekend(date) && 'bg-blue-50'
+                          isWeekend(date, weekendDays) && 'bg-blue-100 dark:bg-blue-950'
                         )}
                       >
                         <div>{getDayName(date)}</div>
@@ -358,7 +386,7 @@ export default function ManageSchedulePage() {
                             key={date.toISOString()}
                             className={cn(
                               'p-4 text-center align-top',
-                              isWeekend(date) && 'bg-blue-50'
+                              isWeekend(date, weekendDays) && 'bg-blue-100 dark:bg-blue-950'
                             )}
                           >
                             <div className="space-y-1">
