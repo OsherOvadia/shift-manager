@@ -22,9 +22,20 @@ export function formatShortDate(date: Date | string, locale = 'he-IL'): string {
   })
 }
 
-export function getDayName(date: Date | string, locale = 'he-IL'): string {
+const HEBREW_DAY_NAMES = [
+  'יום ראשון',    // Sunday (0)
+  'יום שני',      // Monday (1)
+  'יום שלישי',    // Tuesday (2)
+  'יום רביעי',    // Wednesday (3)
+  'יום חמישי',    // Thursday (4)
+  'יום שישי',     // Friday (5)
+  'יום שבת',      // Saturday (6)
+]
+
+export function getDayName(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date
-  return d.toLocaleDateString(locale, { weekday: 'long' })
+  const dayIndex = d.getDay()
+  return HEBREW_DAY_NAMES[dayIndex]
 }
 
 export function getWeekStartDate(date: Date = new Date()): Date {
