@@ -34,13 +34,14 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       isAuthenticated: false,
 
-      setAuth: (user, accessToken, refreshToken) =>
+      setAuth: (user, accessToken, refreshToken) => {
         set({
           user,
           accessToken,
           refreshToken,
           isAuthenticated: true,
-        }),
+        })
+      },
 
       logout: () => {
         const { refreshToken } = get()
@@ -62,6 +63,26 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
+      // Custom storage that checks both localStorage and sessionStorage
+      storage: {
+        getItem: (name) => {
+          // Check localStorage first (for "Remember Me")
+          const localData = localStorage.getItem(name)
+          if (localData) return localData
+          
+          // Then check sessionStorage (for current session only)
+          const sessionData = sessionStorage.getItem(name)
+          return sessionData || null
+        },
+        setItem: (name, value) => {
+          // By default, save to localStorage (zustand persist does this)
+          localStorage.setItem(name, value)
+        },
+        removeItem: (name) => {
+          localStorage.removeItem(name)
+          sessionStorage.removeItem(name)
+        },
+      },
     }
   )
 )

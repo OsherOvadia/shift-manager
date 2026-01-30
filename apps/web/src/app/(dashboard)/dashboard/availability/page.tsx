@@ -31,11 +31,26 @@ export default function AvailabilityPage() {
   const { accessToken, user } = useAuthStore()
   const [weekOffset, setWeekOffset] = useState(1) // Start with next week
   const [selectedSlots, setSelectedSlots] = useState<Map<string, AvailabilitySlot>>(new Map())
+  const [weekendDays, setWeekendDays] = useState<number[]>([4, 5, 6]) // Thu, Fri, Sat
   
   const currentWeekStart = getWeekStartDate(new Date())
   const targetWeekStart = new Date(currentWeekStart)
   targetWeekStart.setDate(targetWeekStart.getDate() + weekOffset * 7)
   const weekDates = getWeekDates(targetWeekStart)
+
+  // Fetch business settings to get actual weekend days
+  const { data: settings } = useQuery({
+    queryKey: ['business-settings'],
+    queryFn: () => api.get<any>('/settings', accessToken!),
+    enabled: !!accessToken,
+  })
+
+  // Update weekend days when settings are loaded
+  useEffect(() => {
+    if (settings?.weekendDays) {
+      setWeekendDays(settings.weekendDays)
+    }
+  }, [settings])
 
   const { data: existingSubmission, isLoading } = useQuery({
     queryKey: ['availability', targetWeekStart.toISOString()],
@@ -132,7 +147,7 @@ export default function AvailabilityPage() {
 
   const weekendSlots = Array.from(selectedSlots.values()).filter((slot) => {
     const date = new Date(slot.shiftDate)
-    return isWeekend(date)
+    return isWeekend(date, weekendDays)
   }).length
 
   const isValid = selectedSlots.size >= getMinShifts() && weekendSlots >= getMinWeekendShifts()
@@ -232,10 +247,10 @@ export default function AvailabilityPage() {
                         key={date.toISOString()}
                         className={cn(
                           'p-4 text-center font-medium min-w-[100px]',
-                          isWeekend(date) && 'bg-blue-50'
+                          isWeekend(date, weekendDays) && 'bg-blue-100 dark:bg-blue-950'
                         )}
                       >
-                        <div>{getDayName(date)}</div>
+                        <div className="text-foreground">{getDayName(date)}</div>
                         <div className="text-sm text-muted-foreground">
                           {formatShortDate(date)}
                         </div>
@@ -255,7 +270,7 @@ export default function AvailabilityPage() {
                           key={date.toISOString()}
                           className={cn(
                             'p-4 text-center',
-                            isWeekend(date) && 'bg-blue-50'
+                            isWeekend(date, weekendDays) && 'bg-blue-100 dark:bg-blue-950'
                           )}
                         >
                           <Checkbox

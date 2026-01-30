@@ -55,7 +55,24 @@ export default function LoginPage() {
         user: any
       }>('/auth/login', data)
 
+      // Store auth data
       setAuth(response.user, response.accessToken, response.refreshToken)
+
+      // If "Remember Me" is NOT checked, store tokens in sessionStorage instead
+      if (!data.rememberMe) {
+        // Clear localStorage
+        localStorage.removeItem('auth-storage')
+        // Store in sessionStorage (will be cleared when browser closes)
+        sessionStorage.setItem('auth-storage', JSON.stringify({
+          state: {
+            user: response.user,
+            accessToken: response.accessToken,
+            refreshToken: response.refreshToken,
+            isAuthenticated: true,
+          },
+          version: 0,
+        }))
+      }
 
       toast({
         title: 'התחברת בהצלחה',
