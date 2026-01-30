@@ -1,6 +1,7 @@
 {
   "version": 2,
-  "buildCommand": "cp prisma/schema.production.prisma prisma/schema.prisma && npx prisma generate && npm run build",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install && cp prisma/schema.production.prisma prisma/schema.prisma",
   "outputDirectory": "dist",
   "builds": [
     {
