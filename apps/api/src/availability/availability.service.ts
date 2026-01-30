@@ -60,7 +60,7 @@ export class AvailabilityService {
     const weekStartDate = this.normalizeToWeekStart(new Date(createDto.weekStartDate));
 
     // Validate against work rules
-    const weekendDays = parseWeekendDays(user.organization.businessSettings?.weekendDays || '5,6');
+    const weekendDays = parseWeekendDays((user.organization.businessSettings?.weekendDays || '5,6') as any);
     const validation = this.validateSubmission(createDto.slots, user.employmentType, weekendDays);
 
     if (!validation.valid) {
@@ -166,7 +166,7 @@ export class AvailabilityService {
         },
       });
 
-      const weekendDays = parseWeekendDays(user!.organization.businessSettings?.weekendDays || '5,6');
+      const weekendDays = parseWeekendDays((user!.organization.businessSettings?.weekendDays || '5,6') as any);
       const validation = this.validateSubmission(
         updateDto.slots,
         user!.employmentType,
@@ -264,7 +264,7 @@ export class AvailabilityService {
 
     const updatedSubmission = await this.prisma.availabilitySubmission.update({
       where: { id },
-      data: { status },
+      data: { status: status as any },
       include: {
         user: {
           select: {
