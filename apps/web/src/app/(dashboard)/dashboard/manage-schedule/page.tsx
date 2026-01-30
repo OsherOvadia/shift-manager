@@ -6,13 +6,15 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
@@ -35,6 +37,8 @@ export default function ManageSchedulePage() {
   
   const [weekOffset, setWeekOffset] = useState(0)
   const [weekendDays, setWeekendDays] = useState<number[]>([4, 5, 6]) // Thu, Fri, Sat
+  const [selectedShift, setSelectedShift] = useState<{ date: Date; shiftType: string } | null>(null)
+  const [selectedWorkers, setSelectedWorkers] = useState<string[]>([])
 
   // Parse week from URL or use current week
   const urlWeek = searchParams.get('week')
@@ -211,18 +215,42 @@ export default function ManageSchedulePage() {
     })
   }
 
-  const handleAddAssignment = (userId: string, date: Date, shiftType: string) => {
-    if (!currentSchedule) return
+  const handleAddAssignments = async () => {
+    if (!currentSchedule || !selectedShift || selectedWorkers.length === 0) return
 
-    const template = getShiftTemplateByType(shiftType)
+    const template = getShiftTemplateByType(selectedShift.shiftType)
     if (!template) return
 
-    createAssignmentMutation.mutate({
-      scheduleId: currentSchedule.id,
-      userId,
-      shiftTemplateId: template.id,
-      shiftDate: date.toISOString(),
+    // Add all selected workers to the shift
+    for (const userId of selectedWorkers) {
+      await createAssignmentMutation.mutateAsync({
+        scheduleId: currentSchedule.id,
+        userId,
+        shiftTemplateId: template.id,
+        shiftDate: selectedShift.date.toISOString(),
+      })
+    }
+
+    toast({
+      title: 'השיבוצים נוספו בהצלחה',
+      description: `${selectedWorkers.length} עובדים שובצו למשמרת`,
     })
+
+    // Close dialog and reset
+    setSelectedShift(null)
+    setSelectedWorkers([])
+    queryClient.invalidateQueries({ queryKey: ['schedule'] })
+  }
+
+  const openShiftDialog = (date: Date, shiftType: string) => {
+    setSelectedShift({ date, shiftType })
+    setSelectedWorkers([])
+  }
+
+  const toggleWorker = (userId: string) => {
+    setSelectedWorkers((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    )
   }
 
   const getShiftTemplateByType = (shiftType: string) => {
@@ -434,29 +462,15 @@ export default function ManageSchedulePage() {
                                 </div>
                               ))}
                               {currentSchedule.status === 'DRAFT' && template && (
-                                <Select
-                                  value=""
-                                  onValueChange={(userId) => handleAddAssignment(userId, date, shift.value)}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full h-8 text-xs"
+                                  onClick={() => openShiftDialog(date, shift.value)}
                                 >
-                                  <SelectTrigger className="w-full h-8 text-xs">
-                                    <SelectValue placeholder="+ הוסף עובד" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {getEmployeesForShift(date, shift.value).map((emp) => {
-                                      const hasAvail = hasAvailability(emp.id, date, shift.value)
-                                      return (
-                                        <SelectItem key={emp.id} value={emp.id}>
-                                          <div className="flex items-center gap-2">
-                                            <span>{emp.firstName} {emp.lastName}</span>
-                                            {hasAvail && (
-                                              <span className="text-xs text-green-600 dark:text-green-400">✓</span>
-                                            )}
-                                          </div>
-                                        </SelectItem>
-                                      )
-                                    })}
-                                  </SelectContent>
-                                </Select>
+                                  <Plus className="h-3 w-3 ml-1" />
+                                  הוסף עובדים
+                                </Button>
                               )}
                             </div>
                           </td>
@@ -470,6 +484,100 @@ export default function ManageSchedulePage() {
           </CardContent>
         </Card>
       ) : null}
+
+      {/* Worker Selection Dialog */}
+      <Dialog open={!!selectedShift} onOpenChange={(open) => !open && setSelectedShift(null)}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>בחר עובדים למשמרת</DialogTitle>
+            <DialogDescription>
+              {selectedShift && (
+                <>
+                  {getDayName(selectedShift.date)} - {formatShortDate(selectedShift.date)}
+                  <br />
+                  {SHIFT_TYPES.find((s) => s.value === selectedShift.shiftType)?.label}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto py-4 space-y-2">
+            {selectedShift &&
+              getEmployeesForShift(selectedShift.date, selectedShift.shiftType).map((emp) => {
+                const hasAvail = hasAvailability(emp.id, selectedShift.date, selectedShift.shiftType)
+                const isAssigned = scheduleDetails?.shiftAssignments?.some(
+                  (a: any) =>
+                    a.userId === emp.id &&
+                    new Date(a.shiftDate).toISOString().split('T')[0] ===
+                      selectedShift.date.toISOString().split('T')[0] &&
+                    a.shiftTemplate.shiftType === selectedShift.shiftType
+                )
+                
+                return (
+                  <div
+                    key={emp.id}
+                    className={cn(
+                      'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                      selectedWorkers.includes(emp.id)
+                        ? 'bg-primary/10 border-primary'
+                        : 'hover:bg-muted',
+                      isAssigned && 'opacity-50'
+                    )}
+                    onClick={() => !isAssigned && toggleWorker(emp.id)}
+                  >
+                    <Checkbox
+                      checked={selectedWorkers.includes(emp.id)}
+                      disabled={isAssigned}
+                      onCheckedChange={() => toggleWorker(emp.id)}
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">
+                          {emp.firstName} {emp.lastName}
+                        </span>
+                        {hasAvail && (
+                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">
+                            ✓ ביקש משמרת
+                          </Badge>
+                        )}
+                      </div>
+                      {isAssigned && (
+                        <span className="text-xs text-muted-foreground">כבר משובץ</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSelectedShift(null)
+                setSelectedWorkers([])
+              }}
+            >
+              ביטול
+            </Button>
+            <Button
+              onClick={handleAddAssignments}
+              disabled={selectedWorkers.length === 0 || createAssignmentMutation.isPending}
+            >
+              {createAssignmentMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                  משבץ...
+                </>
+              ) : (
+                <>
+                  שבץ {selectedWorkers.length} עובדים
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
