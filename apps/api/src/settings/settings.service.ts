@@ -11,27 +11,34 @@ export class SettingsService {
       where: { organizationId },
     });
 
+    // Check if we're using PostgreSQL (array) or SQLite (string)
+    const isPostgres = process.env.DATABASE_URL?.includes('postgres');
+
     if (!settings) {
       // Create default settings if not exist
       const created = await this.prisma.businessSettings.create({
         data: {
           organizationId,
-          weekendDays: '5,6',
+          weekendDays: isPostgres ? [5, 6] : '5,6',
           submissionDeadlineDay: 4,
           submissionDeadlineHour: 18,
-        },
+        } as any,
       });
       // Return with parsed weekendDays for API response
       return {
         ...created,
-        weekendDays: created.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
+        weekendDays: Array.isArray(created.weekendDays) 
+          ? created.weekendDays 
+          : created.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
       };
     }
 
     // Return with parsed weekendDays for API response
     return {
       ...settings,
-      weekendDays: settings.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
+      weekendDays: Array.isArray(settings.weekendDays) 
+        ? settings.weekendDays 
+        : settings.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
     };
   }
 
@@ -40,10 +47,20 @@ export class SettingsService {
       where: { organizationId },
     });
 
-    // Convert weekendDays array to comma-separated string for storage
-    const dataToSave: any = { ...updateDto };
-    if (updateDto.weekendDays) {
-      dataToSave.weekendDays = updateDto.weekendDays.join(',');
+    // Build update data - convert weekendDays array if provided
+    const dataToSave: any = {};
+    
+    // Check if we're using PostgreSQL (array) or SQLite (string)
+    const isPostgres = process.env.DATABASE_URL?.includes('postgres');
+    
+    if (updateDto.weekendDays !== undefined) {
+      dataToSave.weekendDays = isPostgres ? updateDto.weekendDays : updateDto.weekendDays.join(',');
+    }
+    if (updateDto.submissionDeadlineDay !== undefined) {
+      dataToSave.submissionDeadlineDay = updateDto.submissionDeadlineDay;
+    }
+    if (updateDto.submissionDeadlineHour !== undefined) {
+      dataToSave.submissionDeadlineHour = updateDto.submissionDeadlineHour;
     }
 
     if (!settings) {
@@ -51,14 +68,16 @@ export class SettingsService {
       const created = await this.prisma.businessSettings.create({
         data: {
           organizationId,
-          weekendDays: dataToSave.weekendDays || '5,6',
+          weekendDays: dataToSave.weekendDays || (isPostgres ? [5, 6] : '5,6'),
           submissionDeadlineDay: dataToSave.submissionDeadlineDay || 4,
           submissionDeadlineHour: dataToSave.submissionDeadlineHour || 18,
-        },
+        } as any,
       });
       return {
         ...created,
-        weekendDays: created.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
+        weekendDays: Array.isArray(created.weekendDays) 
+          ? created.weekendDays 
+          : created.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
       };
     }
 
@@ -69,7 +88,9 @@ export class SettingsService {
 
     return {
       ...updated,
-      weekendDays: updated.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
+      weekendDays: Array.isArray(updated.weekendDays) 
+        ? updated.weekendDays 
+        : updated.weekendDays.split(',').map((d: string) => parseInt(d, 10)),
     };
   }
 }
