@@ -46,6 +46,7 @@ export function getWeekDates(startDate: Date): Date[] {
   return dates
 }
 
-export function isWeekend(date: Date, weekendDays: number[] = [5, 6]): boolean {
+// Weekend days: Thursday (4), Friday (5), Saturday (6)
+export function isWeekend(date: Date, weekendDays: number[] = [4, 5, 6]): boolean {
   return weekendDays.includes(date.getDay())
 }

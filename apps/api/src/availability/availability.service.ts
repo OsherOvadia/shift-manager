@@ -10,10 +10,11 @@ const WORK_RULES: Record<string, { minShifts: number; minWeekendShifts: number }
   PART_TIME: { minShifts: 3, minWeekendShifts: 1 },
 };
 
-// Helper to parse weekend days from string
-function parseWeekendDays(weekendDaysStr: string | null): number[] {
-  if (!weekendDaysStr) return [5, 6];
-  return weekendDaysStr.split(',').map(d => parseInt(d.trim(), 10));
+// Helper to parse weekend days (handles both Int[] for PostgreSQL and string for SQLite)
+function parseWeekendDays(weekendDays: number[] | string | null): number[] {
+  if (!weekendDays) return [4, 5, 6]; // Thu, Fri, Sat
+  if (Array.isArray(weekendDays)) return weekendDays;
+  return (weekendDays as string).split(',').map(d => parseInt(d.trim(), 10));
 }
 
 @Injectable()
@@ -60,7 +61,7 @@ export class AvailabilityService {
     const weekStartDate = this.normalizeToWeekStart(new Date(createDto.weekStartDate));
 
     // Validate against work rules
-    const weekendDays = parseWeekendDays((user.organization.businessSettings?.weekendDays || '5,6') as any);
+    const weekendDays = parseWeekendDays(user.organization.businessSettings?.weekendDays ?? null);
     const validation = this.validateSubmission(createDto.slots, user.employmentType, weekendDays);
 
     if (!validation.valid) {
@@ -166,7 +167,7 @@ export class AvailabilityService {
         },
       });
 
-      const weekendDays = parseWeekendDays((user!.organization.businessSettings?.weekendDays || '5,6') as any);
+      const weekendDays = parseWeekendDays(user!.organization.businessSettings?.weekendDays ?? null);
       const validation = this.validateSubmission(
         updateDto.slots,
         user!.employmentType,

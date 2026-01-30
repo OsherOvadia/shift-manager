@@ -14,9 +14,9 @@ import { Loader2, ChevronRight, ChevronLeft, Save, AlertCircle } from 'lucide-re
 import { cn } from '@/lib/utils'
 
 const SHIFT_TYPES = [
-  { value: 'MORNING', label: 'בוקר', time: '07:00-15:00' },
-  { value: 'EVENING', label: 'ערב', time: '15:00-23:00' },
-  { value: 'EVENING_CLOSE', label: 'ערב + סגירה', time: '15:00-01:00' },
+  { value: 'MORNING', label: 'בוקר', time: '11:00-18:00' },
+  { value: 'EVENING', label: 'ערב', time: '18:00-22:00' },
+  { value: 'EVENING_CLOSE', label: 'ערב + סגירה', time: '18:00-00:00' },
 ]
 
 interface AvailabilitySlot {
