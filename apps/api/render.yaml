@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: shift-manager-api
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: cp prisma/schema.production.prisma prisma/schema.prisma && npm install && npx prisma generate && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /api
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
