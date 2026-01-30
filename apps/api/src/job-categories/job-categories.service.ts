@@ -60,7 +60,9 @@ export class JobCategoriesService {
 
     return this.prisma.jobCategory.create({
       data: {
-        ...createDto,
+        name: createDto.name,
+        nameHe: createDto.nameHe,
+        color: createDto.color || '#3B82F6',
         organizationId,
       },
     });
@@ -86,9 +88,15 @@ export class JobCategoriesService {
       }
     }
 
+    const updateData: any = {};
+    if (updateDto.name !== undefined) updateData.name = updateDto.name;
+    if (updateDto.nameHe !== undefined) updateData.nameHe = updateDto.nameHe;
+    if (updateDto.color !== undefined) updateData.color = updateDto.color;
+    if (updateDto.isActive !== undefined) updateData.isActive = updateDto.isActive;
+
     return this.prisma.jobCategory.update({
       where: { id },
-      data: updateDto,
+      data: updateData,
     });
   }
 

@@ -106,9 +106,12 @@ export class AssignmentsService {
       throw new NotFoundException('השיבוץ לא נמצא');
     }
 
+    const updateData: any = {};
+    if (updateDto.status !== undefined) updateData.status = updateDto.status;
+
     const updatedAssignment = await this.prisma.shiftAssignment.update({
       where: { id },
-      data: updateDto,
+      data: updateData,
       include: {
         user: {
           select: {

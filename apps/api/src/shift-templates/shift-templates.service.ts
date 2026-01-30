@@ -36,7 +36,12 @@ export class ShiftTemplatesService {
   async create(createDto: CreateShiftTemplateDto, organizationId: string) {
     return this.prisma.shiftTemplate.create({
       data: {
-        ...createDto,
+        name: createDto.name,
+        shiftType: createDto.shiftType,
+        startTime: createDto.startTime,
+        endTime: createDto.endTime,
+        minStaff: createDto.minStaff,
+        maxStaff: createDto.maxStaff,
         organizationId,
       },
     });
@@ -45,9 +50,18 @@ export class ShiftTemplatesService {
   async update(id: string, updateDto: UpdateShiftTemplateDto, organizationId: string) {
     await this.findOne(id, organizationId);
 
+    const updateData: any = {};
+    if (updateDto.name !== undefined) updateData.name = updateDto.name;
+    if (updateDto.shiftType !== undefined) updateData.shiftType = updateDto.shiftType;
+    if (updateDto.startTime !== undefined) updateData.startTime = updateDto.startTime;
+    if (updateDto.endTime !== undefined) updateData.endTime = updateDto.endTime;
+    if (updateDto.minStaff !== undefined) updateData.minStaff = updateDto.minStaff;
+    if (updateDto.maxStaff !== undefined) updateData.maxStaff = updateDto.maxStaff;
+    if (updateDto.isActive !== undefined) updateData.isActive = updateDto.isActive;
+
     return this.prisma.shiftTemplate.update({
       where: { id },
-      data: updateDto,
+      data: updateData,
     });
   }
 

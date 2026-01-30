@@ -65,14 +65,16 @@ export class UsersService {
       throw new NotFoundException('המשתמש לא נמצא');
     }
 
+    const updateData: any = {
+      isApproved: true,
+    };
+    if (data?.jobCategoryId) updateData.jobCategoryId = data.jobCategoryId;
+    if (data?.hourlyWage !== undefined) updateData.hourlyWage = data.hourlyWage;
+    if (data?.employmentType) updateData.employmentType = data.employmentType;
+
     return this.prisma.user.update({
       where: { id },
-      data: {
-        isApproved: true,
-        ...(data?.jobCategoryId && { jobCategoryId: data.jobCategoryId }),
-        ...(data?.hourlyWage !== undefined && { hourlyWage: data.hourlyWage }),
-        ...(data?.employmentType && { employmentType: data.employmentType }),
-      },
+      data: updateData,
       select: {
         id: true,
         email: true,
