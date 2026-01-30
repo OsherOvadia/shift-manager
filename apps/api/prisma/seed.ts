@@ -26,7 +26,7 @@ async function main() {
       name: 'Demo Organization',
       businessSettings: {
         create: {
-          weekendDays: '5,6',
+          weekendDays: process.env.DATABASE_URL?.includes('neon') ? [5, 6] : '5,6' as any,
           submissionDeadlineDay: 4,
           submissionDeadlineHour: 18,
         },
