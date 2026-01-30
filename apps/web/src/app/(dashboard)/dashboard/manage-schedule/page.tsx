@@ -516,11 +516,13 @@ export default function ManageSchedulePage() {
                 <>
                   {withAvailability.length > 0 && (
                     <>
-                      <div className="px-3 pb-2 text-xs font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
-                        <span className="text-base">✓</span>
-                        ביקשו משמרת זו ({withAvailability.length})
+                      <div className="px-3 py-2 mb-3 bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/40 dark:to-emerald-900/40 rounded-lg border-2 border-green-400 dark:border-green-600">
+                        <div className="text-sm font-bold text-green-800 dark:text-green-200 flex items-center gap-2">
+                          <span className="text-xl">✓</span>
+                          ביקשו משמרת זו ({withAvailability.length})
+                        </div>
                       </div>
-                      <div className="space-y-2 mb-4">
+                      <div className="space-y-2 mb-6">
                         {withAvailability.map((emp) => {
                           const isAssigned = scheduleDetails?.shiftAssignments?.some(
                             (a: any) =>
@@ -534,10 +536,10 @@ export default function ManageSchedulePage() {
                             <div
                               key={emp.id}
                               className={cn(
-                                'flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all',
+                                'flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all shadow-sm',
                                 selectedWorkers.includes(emp.id)
-                                  ? 'bg-green-50 dark:bg-green-950 border-green-500 shadow-sm'
-                                  : 'bg-green-50/50 dark:bg-green-950/30 border-green-300 dark:border-green-800 hover:border-green-400 dark:hover:border-green-700',
+                                  ? 'bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/50 dark:to-emerald-900/50 border-green-600 shadow-md ring-2 ring-green-200'
+                                  : 'bg-green-50 dark:bg-green-950/50 border-green-400 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/40 hover:border-green-500 hover:shadow',
                                 isAssigned && 'opacity-50 cursor-not-allowed'
                               )}
                               onClick={() => !isAssigned && toggleWorker(emp.id)}
@@ -546,14 +548,14 @@ export default function ManageSchedulePage() {
                                 checked={selectedWorkers.includes(emp.id)}
                                 disabled={isAssigned}
                                 onCheckedChange={() => toggleWorker(emp.id)}
-                                className="border-green-600"
+                                className="border-2 border-green-700 data-[state=checked]:bg-green-600"
                               />
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-green-900 dark:text-green-100">
+                                  <span className="font-bold text-base text-green-900 dark:text-green-100">
                                     {emp.firstName} {emp.lastName}
                                   </span>
-                                  <span className="text-xs text-green-600 dark:text-green-400">✓</span>
+                                  <span className="text-lg text-green-600 dark:text-green-400">✓</span>
                                 </div>
                                 {isAssigned && (
                                   <span className="text-xs text-muted-foreground">כבר משובץ</span>
@@ -569,7 +571,7 @@ export default function ManageSchedulePage() {
                   {withoutAvailability.length > 0 && (
                     <>
                       {withAvailability.length > 0 && (
-                        <div className="px-3 py-2 text-xs font-semibold text-muted-foreground border-t">
+                        <div className="px-3 py-2 mb-3 text-sm font-semibold text-gray-600 dark:text-gray-400 border-t-2 pt-4">
                           עובדים נוספים ({withoutAvailability.length})
                         </div>
                       )}
@@ -587,10 +589,10 @@ export default function ManageSchedulePage() {
                             <div
                               key={emp.id}
                               className={cn(
-                                'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                                'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors bg-background',
                                 selectedWorkers.includes(emp.id)
-                                  ? 'bg-primary/10 border-primary'
-                                  : 'hover:bg-muted',
+                                  ? 'bg-primary/10 border-primary shadow-sm'
+                                  : 'hover:bg-muted border-muted-foreground/20',
                                 isAssigned && 'opacity-50 cursor-not-allowed'
                               )}
                               onClick={() => !isAssigned && toggleWorker(emp.id)}
