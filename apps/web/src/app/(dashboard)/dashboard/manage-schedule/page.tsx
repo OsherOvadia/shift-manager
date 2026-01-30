@@ -18,7 +18,7 @@ import {
 import { useToast } from '@/components/ui/use-toast'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
-import { getWeekStartDate, getWeekDates, getDayName, formatShortDate, isWeekend } from '@/lib/utils'
+import { getWeekStartDate, getWeekDates, getDayName, formatShortDate, isWeekend, formatDateLocal } from '@/lib/utils'
 import { Loader2, ChevronRight, ChevronLeft, Plus, Trash2, Send, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -208,9 +208,9 @@ export default function ManageSchedulePage() {
 
   const getAssignmentsForDateAndShift = (date: Date, shiftType: string) => {
     if (!scheduleDetails?.shiftAssignments) return []
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = formatDateLocal(date) // Use local date format
     return scheduleDetails.shiftAssignments.filter((a: any) => {
-      const assignmentDate = new Date(a.shiftDate).toISOString().split('T')[0]
+      const assignmentDate = a.shiftDate.split('T')[0]
       return assignmentDate === dateStr && a.shiftTemplate.shiftType === shiftType
     })
   }
@@ -261,18 +261,25 @@ export default function ManageSchedulePage() {
   const getEmployeesForShift = (date: Date, shiftType: string) => {
     if (!employees) return []
     
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = formatDateLocal(date) // Use local date format
+    
+    console.log('🔍 Getting employees for shift:', dateStr, shiftType)
     
     // Find employees who submitted availability for this specific shift
     const employeesWithAvailability: string[] = []
     availabilitySubmissions?.forEach((submission: any) => {
       submission.slots?.forEach((slot: any) => {
-        const slotDate = new Date(slot.shiftDate).toISOString().split('T')[0]
+        // Slot date is already in YYYY-MM-DD format from backend
+        const slotDate = slot.shiftDate.split('T')[0]
+        console.log('  Checking slot:', slotDate, slot.shiftType, 'for user:', submission.userId)
         if (slotDate === dateStr && slot.shiftType === shiftType) {
+          console.log('  ✓ Match! User has availability:', submission.userId)
           employeesWithAvailability.push(submission.userId)
         }
       })
     })
+
+    console.log('📋 Employees with availability:', employeesWithAvailability)
 
     // Sort: employees with availability first, then others
     return [...employees].sort((a, b) => {
@@ -291,13 +298,14 @@ export default function ManageSchedulePage() {
   const hasAvailability = (userId: string, date: Date, shiftType: string) => {
     if (!availabilitySubmissions) return false
     
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = formatDateLocal(date) // Use local date format
     
     return availabilitySubmissions.some((submission: any) => {
       if (submission.userId !== userId) return false
       
       return submission.slots?.some((slot: any) => {
-        const slotDate = new Date(slot.shiftDate).toISOString().split('T')[0]
+        // Slot date is already in YYYY-MM-DD format from backend
+        const slotDate = slot.shiftDate.split('T')[0]
         return slotDate === dateStr && slot.shiftType === shiftType
       })
     })
