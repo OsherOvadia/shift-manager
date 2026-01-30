@@ -19,8 +19,8 @@ export class SettingsService {
       const created = await this.prisma.businessSettings.create({
         data: {
           organizationId,
-          weekendDays: isPostgres ? [5, 6] : '5,6',
-          submissionDeadlineDay: 4,
+          weekendDays: isPostgres ? [4, 5, 6] : '4,5,6',
+          submissionDeadlineDay: 3,
           submissionDeadlineHour: 18,
         } as any,
       });
@@ -68,8 +68,8 @@ export class SettingsService {
       const created = await this.prisma.businessSettings.create({
         data: {
           organizationId,
-          weekendDays: dataToSave.weekendDays || (isPostgres ? [5, 6] : '5,6'),
-          submissionDeadlineDay: dataToSave.submissionDeadlineDay || 4,
+          weekendDays: dataToSave.weekendDays || (isPostgres ? [4, 5, 6] : '4,5,6'),
+          submissionDeadlineDay: dataToSave.submissionDeadlineDay || 3,
           submissionDeadlineHour: dataToSave.submissionDeadlineHour || 18,
         } as any,
       });

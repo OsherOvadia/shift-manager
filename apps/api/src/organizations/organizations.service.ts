@@ -18,8 +18,8 @@ export class OrganizationsService {
         name,
         businessSettings: {
           create: {
-            weekendDays: isPostgres ? [5, 6] : '5,6', // Friday, Saturday
-            submissionDeadlineDay: 4, // Thursday
+            weekendDays: isPostgres ? [4, 5, 6] : '4,5,6', // Thursday, Friday, Saturday
+            submissionDeadlineDay: 3, // Wednesday
             submissionDeadlineHour: 18,
           } as any,
         },
@@ -40,24 +40,24 @@ export class OrganizationsService {
               {
                 name: 'משמרת בוקר',
                 shiftType: 'MORNING' as any,
-                startTime: '07:00',
-                endTime: '15:00',
+                startTime: '11:00',
+                endTime: '18:00',
                 minStaff: 2,
                 maxStaff: 5,
               },
               {
                 name: 'משמרת ערב',
                 shiftType: 'EVENING' as any,
-                startTime: '15:00',
-                endTime: '23:00',
+                startTime: '18:00',
+                endTime: '22:00',
                 minStaff: 2,
                 maxStaff: 5,
               },
               {
-                name: 'משמרת ערב + סגירה',
+                name: 'משמרת סגירה',
                 shiftType: 'EVENING_CLOSE' as any,
-                startTime: '15:00',
-                endTime: '01:00',
+                startTime: '18:00',
+                endTime: '00:00',
                 minStaff: 1,
                 maxStaff: 3,
               },

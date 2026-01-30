@@ -49,7 +49,7 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true)
     try {
-      const response = await api.post<{
+      const response = await api.public.post<{
         accessToken: string
         refreshToken: string
         user: any
