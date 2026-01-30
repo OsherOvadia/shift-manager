@@ -53,16 +53,31 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const { user, isAuthenticated, logout, _hasHydrated } = useAuthStore()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  // Wait for client-side mount
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
-    // Only check auth after hydration is complete
-    if (_hasHydrated && !isAuthenticated) {
+    // Only check auth after both mounted AND hydration is complete
+    if (mounted && _hasHydrated && !isAuthenticated) {
       router.push('/login')
     }
-  }, [_hasHydrated, isAuthenticated, router])
+  }, [mounted, _hasHydrated, isAuthenticated, router])
 
-  // Show nothing while waiting for hydration
-  if (!_hasHydrated || !isAuthenticated || !user) {
+  // Show loading while waiting for hydration (don't show null immediately)
+  if (!mounted || !_hasHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  // After hydration, if not authenticated, show nothing (will redirect)
+  if (!isAuthenticated || !user) {
     return null
   }
 
