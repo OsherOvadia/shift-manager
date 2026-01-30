@@ -2,18 +2,18 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { AppModule } from '../src/app.module';
-import express from 'express';
+import express, { Request, Response } from 'express';
 
-let cachedServer: any;
+let cachedApp: express.Application | null = null;
 
-async function createServer() {
-  if (!cachedServer) {
+async function bootstrap() {
+  if (!cachedApp) {
     const expressApp = express();
-    const app = await NestFactory.create(
-      AppModule,
-      new ExpressAdapter(expressApp),
-      { logger: ['error', 'warn', 'log'] }
-    );
+    const adapter = new ExpressAdapter(expressApp);
+    
+    const app = await NestFactory.create(AppModule, adapter, {
+      logger: ['error', 'warn', 'log'],
+    });
 
     // Enable CORS
     app.enableCors({
@@ -41,12 +41,12 @@ async function createServer() {
     app.setGlobalPrefix('api');
 
     await app.init();
-    cachedServer = expressApp;
+    cachedApp = expressApp;
   }
-  return cachedServer;
+  return cachedApp;
 }
 
-export default async (req: any, res: any) => {
-  const server = await createServer();
-  return server(req, res);
+export default async (req: Request, res: Response) => {
+  const app = await bootstrap();
+  app(req, res);
 };
