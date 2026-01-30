@@ -44,7 +44,7 @@ export default function JobCategoriesPage() {
   })
   const [justCreated, setJustCreated] = useState<string | null>(null)
 
-  const { data: categories, isLoading } = useQuery({
+  const { data: categories, isLoading } = useQuery<any[]>({
     queryKey: ['job-categories'],
     queryFn: () => api.get('/job-categories'),
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes

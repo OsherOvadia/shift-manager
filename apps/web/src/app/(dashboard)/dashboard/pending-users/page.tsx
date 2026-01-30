@@ -47,12 +47,12 @@ export default function PendingUsersPage() {
   })
   const [showConfetti, setShowConfetti] = useState(false)
 
-  const { data: pendingUsers, isLoading } = useQuery({
+  const { data: pendingUsers, isLoading } = useQuery<any[]>({
     queryKey: ['pending-users'],
     queryFn: () => api.get('/users/pending'),
   })
 
-  const { data: jobCategories } = useQuery({
+  const { data: jobCategories } = useQuery<any[]>({
     queryKey: ['job-categories'],
     queryFn: () => api.get('/job-categories/active'),
   })
