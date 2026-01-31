@@ -60,31 +60,16 @@ export default function RevenuePage() {
     for (let i = 0; i < 7; i++) {
       dates.push(addDays(weekStart, i))
     }
-    console.log('📅 Week dates generated:', dates.map(d => formatDateLocal(d)))
     return dates
   }, [weekStart])
 
   const selectedDate = weekDates[selectedDay]
-  
-  useEffect(() => {
-    console.log('📌 Selected day:', selectedDay, '→', selectedDate ? formatDateLocal(selectedDate) : 'none')
-  }, [selectedDay, selectedDate])
 
   // Fetch schedule with shift assignments for the week
   const { data: scheduleData, isLoading: scheduleLoading } = useQuery({
     queryKey: ['schedule-week', weekStart.toISOString()],
     queryFn: async () => {
       const result = await api.get(`/schedules/week/${weekStart.toISOString()}`, accessToken!)
-      console.log('📥 Schedule data received:', {
-        id: result?.id,
-        weekStartDate: result?.weekStartDate,
-        assignmentsCount: result?.shiftAssignments?.length || 0,
-        firstFewAssignments: result?.shiftAssignments?.slice(0, 3).map((a: any) => ({
-          date: a.shiftDate,
-          employee: `${a.user?.firstName} ${a.user?.lastName}`,
-          shift: a.shiftTemplate?.name
-        }))
-      })
       return result
     },
     enabled: !!accessToken,
@@ -200,7 +185,7 @@ export default function RevenuePage() {
 
     setSavingRevenue(dateKey)
     saveDailyRevenueMutation.mutate({
-      date: date.toISOString(),
+      date: dateKey, // Use formatted date to avoid timezone issues
       totalRevenue: amount,
     })
   }
@@ -226,23 +211,13 @@ export default function RevenuePage() {
 
   // Get shifts for a specific date
   const getShiftsForDate = (date: Date) => {
-    if (!scheduleData?.shiftAssignments) {
-      console.log('❌ No schedule data or assignments')
-      return []
-    }
+    if (!scheduleData?.shiftAssignments) return []
     
     const dateStr = getDateStr(date)
-    console.log('🔍 Looking for shifts on:', dateStr)
-    console.log('📊 Total assignments in schedule:', scheduleData.shiftAssignments.length)
-    
-    const filtered = scheduleData.shiftAssignments.filter((a: any) => {
+    return scheduleData.shiftAssignments.filter((a: any) => {
       const assignmentDateStr = getDateStr(a.shiftDate)
-      console.log('  📅 Assignment date:', a.shiftDate, '→', assignmentDateStr, 'Match:', assignmentDateStr === dateStr)
       return assignmentDateStr === dateStr
     })
-    
-    console.log('✅ Found', filtered.length, 'shifts for', dateStr)
-    return filtered
   }
 
   // Get revenue for a specific date
@@ -471,71 +446,87 @@ export default function RevenuePage() {
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          {shiftsForSelectedDay.map((assignment: any) => (
-                            <div 
-                              key={assignment.id} 
-                              className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border"
-                            >
-                              {/* Employee Info */}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium truncate">
-                                    {assignment.user?.firstName} {assignment.user?.lastName}
-                                  </span>
-                                  <Badge 
-                                    className={SHIFT_TYPES[assignment.shiftTemplate?.shiftType]?.color || 'bg-gray-100'}
-                                  >
-                                    {SHIFT_TYPES[assignment.shiftTemplate?.shiftType]?.label || assignment.shiftTemplate?.name}
-                                  </Badge>
-                                </div>
-                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                  <span className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
-                                    {assignment.shiftTemplate?.startTime} - {assignment.shiftTemplate?.endTime}
-                                  </span>
-                                  {assignment.user?.jobCategory && (
-                                    <Badge variant="outline" className="text-[10px]">
-                                      {assignment.user.jobCategory.nameHe || assignment.user.jobCategory.name}
+                          {shiftsForSelectedDay.map((assignment: any) => {
+                            const isTipBased = assignment.user?.isTipBased
+                            
+                            return (
+                              <div 
+                                key={assignment.id} 
+                                className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border"
+                              >
+                                {/* Employee Info */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-medium truncate">
+                                      {assignment.user?.firstName} {assignment.user?.lastName}
+                                    </span>
+                                    <Badge 
+                                      className={SHIFT_TYPES[assignment.shiftTemplate?.shiftType]?.color || 'bg-gray-100'}
+                                    >
+                                      {SHIFT_TYPES[assignment.shiftTemplate?.shiftType]?.label || assignment.shiftTemplate?.name}
                                     </Badge>
-                                  )}
+                                    {isTipBased && (
+                                      <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
+                                        טיפים
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="h-3 w-3" />
+                                      {assignment.shiftTemplate?.startTime} - {assignment.shiftTemplate?.endTime}
+                                    </span>
+                                    {assignment.user?.jobCategory && (
+                                      <Badge variant="outline" className="text-[10px]">
+                                        {assignment.user.jobCategory.nameHe || assignment.user.jobCategory.name}
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
 
-                              {/* Tips Input */}
-                              <div className="flex items-center gap-2">
-                                <div className="w-24">
-                                  <Input
-                                    type="number"
-                                    placeholder="טיפ ₪"
-                                    value={tipsInputs[assignment.id] || ''}
-                                    onChange={(e) => setTipsInputs(prev => ({
-                                      ...prev,
-                                      [assignment.id]: e.target.value
-                                    }))}
-                                    className="h-9 text-center"
-                                    min="0"
-                                  />
-                                </div>
-                                <Button 
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleSaveTips(assignment.id)}
-                                  disabled={savingTips === assignment.id}
-                                  className="h-9 w-9 p-0"
-                                >
-                                  {savingTips === assignment.id ? (
-                                    <motion.div 
-                                      className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full"
-                                      animate={{ rotate: 360 }}
-                                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                                    />
-                                  ) : (
-                                    <Save className="h-4 w-4" />
-                                  )}
-                                </Button>
+                                {/* Tips Input - only for tip-based employees */}
+                                {isTipBased ? (
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-24">
+                                      <Input
+                                        type="number"
+                                        placeholder="טיפ ₪"
+                                        value={tipsInputs[assignment.id] || ''}
+                                        onChange={(e) => setTipsInputs(prev => ({
+                                          ...prev,
+                                          [assignment.id]: e.target.value
+                                        }))}
+                                        className="h-9 text-center"
+                                        min="0"
+                                      />
+                                    </div>
+                                    <Button 
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleSaveTips(assignment.id)}
+                                      disabled={savingTips === assignment.id}
+                                      className="h-9 w-9 p-0"
+                                      title="שמור טיפ"
+                                    >
+                                      {savingTips === assignment.id ? (
+                                        <motion.div 
+                                          className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full"
+                                          animate={{ rotate: 360 }}
+                                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                        />
+                                      ) : (
+                                        <Save className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-muted-foreground px-3">
+                                    לא נדרש טיפ
+                                  </div>
+                                )}
                               </div>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       )}
                     </CardContent>

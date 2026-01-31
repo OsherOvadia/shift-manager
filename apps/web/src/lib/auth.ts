@@ -89,7 +89,7 @@ export const useAuthStore = create<AuthState>()(
           try {
             // Parse the value to check rememberMe flag
             const parsedValue = JSON.parse(value)
-            const rememberMe = parsedValue.state?.rememberMe ?? true
+            const rememberMe = parsedValue.state?.rememberMe ?? false // Default to false (session only)
             
             if (rememberMe) {
               // Save to localStorage (persists across browser sessions)
@@ -101,8 +101,8 @@ export const useAuthStore = create<AuthState>()(
               localStorage.removeItem(name)
             }
           } catch {
-            // Fallback to localStorage if parsing fails
-            localStorage.setItem(name, value)
+            // Fallback to sessionStorage if parsing fails (safer default)
+            sessionStorage.setItem(name, value)
           }
         },
         removeItem: (name) => {
