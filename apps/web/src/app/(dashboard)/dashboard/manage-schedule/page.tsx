@@ -95,12 +95,13 @@ export default function ManageSchedulePage() {
 
   // Find or create schedule for current week
   const currentSchedule = schedules?.find((s) => {
+    // Use UTC date comparison to avoid timezone issues
     const scheduleDate = new Date(s.weekStartDate)
     const targetDate = new Date(targetWeekStart)
     
-    // Normalize both dates to midnight for comparison
-    scheduleDate.setHours(0, 0, 0, 0)
-    targetDate.setHours(0, 0, 0, 0)
+    // Normalize both dates to midnight UTC for comparison
+    scheduleDate.setUTCHours(0, 0, 0, 0)
+    targetDate.setUTCHours(0, 0, 0, 0)
     
     return scheduleDate.getTime() === targetDate.getTime()
   })
