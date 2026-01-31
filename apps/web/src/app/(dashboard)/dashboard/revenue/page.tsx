@@ -60,15 +60,33 @@ export default function RevenuePage() {
     for (let i = 0; i < 7; i++) {
       dates.push(addDays(weekStart, i))
     }
+    console.log('📅 Week dates generated:', dates.map(d => formatDateLocal(d)))
     return dates
   }, [weekStart])
 
   const selectedDate = weekDates[selectedDay]
+  
+  useEffect(() => {
+    console.log('📌 Selected day:', selectedDay, '→', selectedDate ? formatDateLocal(selectedDate) : 'none')
+  }, [selectedDay, selectedDate])
 
   // Fetch schedule with shift assignments for the week
   const { data: scheduleData, isLoading: scheduleLoading } = useQuery({
     queryKey: ['schedule-week', weekStart.toISOString()],
-    queryFn: () => api.get(`/schedules/week/${weekStart.toISOString()}`, accessToken!),
+    queryFn: async () => {
+      const result = await api.get(`/schedules/week/${weekStart.toISOString()}`, accessToken!)
+      console.log('📥 Schedule data received:', {
+        id: result?.id,
+        weekStartDate: result?.weekStartDate,
+        assignmentsCount: result?.shiftAssignments?.length || 0,
+        firstFewAssignments: result?.shiftAssignments?.slice(0, 3).map((a: any) => ({
+          date: a.shiftDate,
+          employee: `${a.user?.firstName} ${a.user?.lastName}`,
+          shift: a.shiftTemplate?.name
+        }))
+      })
+      return result
+    },
     enabled: !!accessToken,
   })
 
@@ -209,14 +227,22 @@ export default function RevenuePage() {
   // Get shifts for a specific date
   const getShiftsForDate = (date: Date) => {
     if (!scheduleData?.shiftAssignments) {
+      console.log('❌ No schedule data or assignments')
       return []
     }
-    const dateStr = getDateStr(date)
     
-    return scheduleData.shiftAssignments.filter((a: any) => {
+    const dateStr = getDateStr(date)
+    console.log('🔍 Looking for shifts on:', dateStr)
+    console.log('📊 Total assignments in schedule:', scheduleData.shiftAssignments.length)
+    
+    const filtered = scheduleData.shiftAssignments.filter((a: any) => {
       const assignmentDateStr = getDateStr(a.shiftDate)
+      console.log('  📅 Assignment date:', a.shiftDate, '→', assignmentDateStr, 'Match:', assignmentDateStr === dateStr)
       return assignmentDateStr === dateStr
     })
+    
+    console.log('✅ Found', filtered.length, 'shifts for', dateStr)
+    return filtered
   }
 
   // Get revenue for a specific date
