@@ -240,9 +240,9 @@ export default function DashboardLayout({
         {/* Sidebar - Right side for RTL */}
         <aside
           className={cn(
-            'fixed md:sticky top-0 md:top-16 right-0 z-50 md:z-auto h-screen md:h-[calc(100vh-4rem)] w-72 sm:w-80 md:w-64 flex-col border-l bg-background shadow-2xl md:shadow-none transition-transform duration-300 ease-in-out',
+            'fixed md:sticky top-0 md:top-16 right-0 z-50 md:z-auto h-screen md:h-[calc(100vh-4rem)] w-72 sm:w-80 md:w-64 border-l bg-background shadow-2xl md:shadow-none transition-transform duration-300 ease-in-out',
             sidebarOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0',
-            'md:flex'
+            'flex flex-col'
           )}
         >
           {/* Mobile header */}
@@ -334,14 +334,14 @@ export default function DashboardLayout({
                 href={item.href}
                 prefetch={true}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-xl text-[11px] transition-all active:scale-95',
+                  'flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-xl text-[10px] transition-all active:scale-95',
                   isActive 
                     ? `${item.textColor} bg-current/10` 
                     : 'text-muted-foreground active:bg-muted'
                 )}
               >
                 <div className={cn(
-                  'p-2 rounded-lg transition-all',
+                  'p-1.5 rounded-lg transition-all',
                   isActive && `${item.color} text-white shadow-md`
                 )}>
                   <item.icon className="h-5 w-5" />
