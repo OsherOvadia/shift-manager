@@ -71,7 +71,7 @@ export default function DashboardLayout({
       if (stored && !isAuthenticated && refreshToken && !isRefreshing) {
         console.log('🔄 Attempting immediate token refresh on mount')
         setIsRefreshing(true)
-        import('./auth').then(({ refreshAccessToken }) => {
+        import('@/lib/auth').then(({ refreshAccessToken }) => {
           refreshAccessToken().finally(() => {
             setIsRefreshing(false)
           })
