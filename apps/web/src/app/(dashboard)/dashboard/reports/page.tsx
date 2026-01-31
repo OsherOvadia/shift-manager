@@ -52,6 +52,8 @@ export default function ReportsPage() {
   const [tipsDialogOpen, setTipsDialogOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null)
+  const [revenueAmount, setRevenueAmount] = useState('')
+  const [tipsAmount, setTipsAmount] = useState<{ [key: string]: string }>({})
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const { accessToken } = useAuthStore()
