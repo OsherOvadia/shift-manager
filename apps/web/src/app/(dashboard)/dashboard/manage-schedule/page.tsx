@@ -100,8 +100,11 @@ export default function ManageSchedulePage() {
     const targetDateStr = targetWeekStart.toISOString().split('T')[0]
     
     console.log('🔍 Schedule comparison:', {
+      scheduleId: s.id,
       scheduleDate: scheduleDateStr,
       targetDate: targetDateStr,
+      rawScheduleDate: s.weekStartDate,
+      rawTargetDate: targetWeekStart.toISOString(),
       match: scheduleDateStr === targetDateStr
     })
     
@@ -109,6 +112,16 @@ export default function ManageSchedulePage() {
   })
   
   console.log('📋 Found schedule:', currentSchedule?.id, 'Total schedules:', schedules?.length)
+  
+  if (schedules && schedules.length > 0 && !currentSchedule) {
+    console.log('⚠️ WARNING: Have schedules but none match current week!')
+    console.log('Available schedules:', schedules.map(s => ({
+      id: s.id,
+      weekStart: new Date(s.weekStartDate).toISOString().split('T')[0],
+      status: s.status
+    })))
+    console.log('Looking for week:', targetWeekStart.toISOString().split('T')[0])
+  }
 
   // Fetch schedule details
   const { data: scheduleDetails, isLoading: detailsLoading, error: detailsError } = useQuery({
