@@ -439,8 +439,8 @@ export default function RevenuePage() {
                                   </div>
                                 </div>
 
-                                {/* Shift Revenue & Tips - only for tip-based employees */}
-                                {isTipBased ? (
+                                {/* Shift Revenue & Tips - for all shifts */}
+                                {true ? (
                                   <div className="flex-1">
                                     <div className="grid grid-cols-5 gap-2 items-end">
                                       {/* Sitting Revenue */}
@@ -551,11 +551,7 @@ export default function RevenuePage() {
                                       </div>
                                     </div>
                                   </div>
-                                ) : (
-                                  <div className="text-xs text-muted-foreground px-3">
-                                    לא נדרש מעקב
-                                  </div>
-                                )}
+                                ) : null}
                               </div>
                             )
                           })}

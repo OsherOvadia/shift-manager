@@ -453,21 +453,24 @@ export default function EmployeesPage() {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="hourlyWage">שכר לשעה (₪)</Label>
-                <Input
-                  id="hourlyWage"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={editingEmployee.hourlyWage}
-                  onChange={(e) =>
-                    setEditingEmployee({ ...editingEmployee, hourlyWage: e.target.value })
-                  }
-                />
-              </div>
-
-              {editingEmployee.isTipBased && (
+              {!editingEmployee.isTipBased ? (
+                <div className="space-y-2">
+                  <Label htmlFor="hourlyWage">שכר לשעה (₪)</Label>
+                  <Input
+                    id="hourlyWage"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editingEmployee.hourlyWage}
+                    onChange={(e) =>
+                      setEditingEmployee({ ...editingEmployee, hourlyWage: e.target.value })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    שכר קבוע לשעה
+                  </p>
+                </div>
+              ) : (
                 <div className="space-y-2">
                   <Label htmlFor="baseHourlyWage">שכר בסיס לשעה (₪)</Label>
                   <Input
