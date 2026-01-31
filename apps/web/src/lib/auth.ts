@@ -127,9 +127,23 @@ export const useAuthStore = create<AuthState>()(
         },
       },
       onRehydrateStorage: () => (state) => {
-        console.log('🔄 Hydrating auth state:', state ? 'has state' : 'no state')
+        console.log('🔄 Hydrating auth state:', {
+          hasState: !!state,
+          isAuthenticated: state?.isAuthenticated,
+          hasUser: !!state?.user,
+          hasTokens: !!(state?.accessToken && state?.refreshToken)
+        })
+        
         if (state) {
           state.setHasHydrated(true)
+          
+          // If we have tokens but not authenticated, fix the state
+          if (state.refreshToken && !state.isAuthenticated) {
+            console.log('⚠️ Fixing broken auth state - has tokens but not authenticated')
+            state.isAuthenticated = true
+          }
+        } else {
+          console.error('❌ No state after hydration!')
         }
       },
     }
