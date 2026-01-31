@@ -100,7 +100,11 @@ export default function EmployeesPage() {
       toast({
         title: 'העובד עודכן בהצלחה',
       })
+      // Invalidate all user-related queries
       queryClient.invalidateQueries({ queryKey: ['users'] })
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      queryClient.invalidateQueries({ queryKey: ['schedule-week'] })
+      queryClient.invalidateQueries({ queryKey: ['weekly-costs'] })
       setIsEditDialogOpen(false)
       setEditingEmployee(null)
     },

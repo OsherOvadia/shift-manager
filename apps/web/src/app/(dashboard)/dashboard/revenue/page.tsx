@@ -47,10 +47,11 @@ const SHIFT_TYPES: Record<string, { label: string; color: string }> = {
 export default function RevenuePage() {
   const [weekStart, setWeekStart] = useState(() => getWeekStartDate(new Date()))
   const [selectedDay, setSelectedDay] = useState<number>(0)
-  const [sittingRevenue, setSittingRevenue] = useState<{ [assignmentId: string]: string }>({})
-  const [takeawayRevenue, setTakeawayRevenue] = useState<{ [assignmentId: string]: string }>({})
-  const [deliveryRevenue, setDeliveryRevenue] = useState<{ [assignmentId: string]: string }>({})
-  const [tips, setTips] = useState<{ [assignmentId: string]: string }>({})
+  // Track data per shift-time (date_shiftType), not per worker
+  const [sittingRevenue, setSittingRevenue] = useState<{ [shiftKey: string]: string }>({})
+  const [takeawayRevenue, setTakeawayRevenue] = useState<{ [shiftKey: string]: string }>({})
+  const [deliveryRevenue, setDeliveryRevenue] = useState<{ [shiftKey: string]: string }>({})
+  const [tips, setTips] = useState<{ [shiftKey: string]: string }>({})
   const [savingData, setSavingData] = useState<string | null>(null)
   const { toast } = useToast()
   const queryClient = useQueryClient()
@@ -117,19 +118,22 @@ export default function RevenuePage() {
   }, [scheduleData])
 
   const updateShiftDataMutation = useMutation({
-    mutationFn: ({ assignmentId, sitting, takeaway, delivery, tips }: { 
-      assignmentId: string; 
+    mutationFn: ({ assignmentIds, sitting, takeaway, delivery, tips }: { 
+      assignmentIds: string[]; 
       sitting: number; 
       takeaway: number; 
       delivery: number;
       tips: number;
     }) =>
-      api.patch(`/assignments/${assignmentId}`, { 
-        sittingTips: sitting,
-        takeawayTips: takeaway,
-        deliveryTips: delivery,
-        tipsEarned: tips 
-      }, accessToken!),
+      // Update all workers in the shift with the same values
+      Promise.all(assignmentIds.map(id =>
+        api.patch(`/assignments/${id}`, { 
+          sittingTips: sitting,
+          takeawayTips: takeaway,
+          deliveryTips: delivery,
+          tipsEarned: tips 
+        }, accessToken!)
+      )),
     onSuccess: () => {
       toast({
         title: 'נשמר בהצלחה',
@@ -160,11 +164,14 @@ export default function RevenuePage() {
     }).format(amount)
   }
 
-  const handleSaveShiftData = (assignmentId: string) => {
-    const sitting = parseFloat(sittingRevenue[assignmentId] || '0')
-    const takeaway = parseFloat(takeawayRevenue[assignmentId] || '0')
-    const delivery = parseFloat(deliveryRevenue[assignmentId] || '0')
-    const tipsValue = parseFloat(tips[assignmentId] || '0')
+  const handleSaveShiftData = (date: Date, shiftType: string, assignmentIds: string[]) => {
+    const dateStr = getDateStr(date)
+    const shiftKey = `${dateStr}_${shiftType}`
+    
+    const sitting = parseFloat(sittingRevenue[shiftKey] || '0')
+    const takeaway = parseFloat(takeawayRevenue[shiftKey] || '0')
+    const delivery = parseFloat(deliveryRevenue[shiftKey] || '0')
+    const tipsValue = parseFloat(tips[shiftKey] || '0')
     
     if (isNaN(sitting) || isNaN(takeaway) || isNaN(delivery) || isNaN(tipsValue) ||
         sitting < 0 || takeaway < 0 || delivery < 0 || tipsValue < 0) {
@@ -176,9 +183,9 @@ export default function RevenuePage() {
       return
     }
 
-    setSavingData(assignmentId)
+    setSavingData(shiftKey)
     updateShiftDataMutation.mutate({
-      assignmentId,
+      assignmentIds,
       sitting,
       takeaway,
       delivery,
@@ -186,15 +193,39 @@ export default function RevenuePage() {
     })
   }
 
-  // Get shifts for a specific date
+  // Get shifts grouped by shift type for a specific date
   const getShiftsForDate = (date: Date) => {
     if (!scheduleData?.shiftAssignments) return []
     
     const dateStr = getDateStr(date)
-    return scheduleData.shiftAssignments.filter((a: any) => {
+    const assignments = scheduleData.shiftAssignments.filter((a: any) => {
       const assignmentDateStr = getDateStr(a.shiftDate)
       return assignmentDateStr === dateStr
     })
+    
+    // Group by shift type
+    const grouped = new Map<string, { 
+      shiftType: string; 
+      shiftTemplate: any; 
+      workers: any[];
+      assignmentIds: string[];
+    }>()
+    
+    assignments.forEach((a: any) => {
+      const shiftType = a.shiftTemplate.shiftType
+      if (!grouped.has(shiftType)) {
+        grouped.set(shiftType, {
+          shiftType,
+          shiftTemplate: a.shiftTemplate,
+          workers: [],
+          assignmentIds: []
+        })
+      }
+      grouped.get(shiftType)!.workers.push(a.user)
+      grouped.get(shiftType)!.assignmentIds.push(a.id)
+    })
+    
+    return Array.from(grouped.values())
   }
 
   // Get revenue for a specific date
@@ -232,6 +263,11 @@ export default function RevenuePage() {
   }, [scheduleData])
 
   const shiftsForSelectedDay = getShiftsForDate(selectedDate)
+  
+  // Helper to get shift key for data tracking
+  const getShiftKey = (date: Date, shiftType: string) => {
+    return `${getDateStr(date)}_${shiftType}`
+  }
 
   return (
     <PageTransition>
@@ -400,158 +436,142 @@ export default function RevenuePage() {
                           <p className="text-sm">שבץ עובדים למשמרות כדי להזין טיפים</p>
                         </div>
                       ) : (
-                        <div className="space-y-3">
-                          {shiftsForSelectedDay.map((assignment: any) => {
-                            const isTipBased = assignment.user?.isTipBased
+                        <div className="space-y-4">
+                          {shiftsForSelectedDay.map((shiftGroup: any) => {
+                            const shiftKey = getShiftKey(date, shiftGroup.shiftType)
                             
                             return (
                               <div 
-                                key={assignment.id} 
-                                className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border"
+                                key={shiftGroup.shiftType} 
+                                className="p-4 bg-muted/50 rounded-lg border"
                               >
-                                {/* Employee Info */}
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="font-medium truncate">
-                                      {assignment.user?.firstName} {assignment.user?.lastName}
-                                    </span>
+                                {/* Shift Header */}
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-3">
                                     <Badge 
-                                      className={SHIFT_TYPES[assignment.shiftTemplate?.shiftType]?.color || 'bg-gray-100'}
+                                      className={SHIFT_TYPES[shiftGroup.shiftType]?.color || 'bg-gray-100'}
                                     >
-                                      {SHIFT_TYPES[assignment.shiftTemplate?.shiftType]?.label || assignment.shiftTemplate?.name}
+                                      {SHIFT_TYPES[shiftGroup.shiftType]?.label || shiftGroup.shiftTemplate.name}
                                     </Badge>
-                                    {isTipBased && (
-                                      <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
-                                        טיפים
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                    <span className="flex items-center gap-1">
-                                      <Clock className="h-3 w-3" />
-                                      {assignment.shiftTemplate?.startTime} - {assignment.shiftTemplate?.endTime}
+                                    <span className="text-sm text-muted-foreground">
+                                      <Clock className="h-3 w-3 inline ml-1" />
+                                      {shiftGroup.shiftTemplate.startTime} - {shiftGroup.shiftTemplate.endTime}
                                     </span>
-                                    {assignment.user?.jobCategory && (
-                                      <Badge variant="outline" className="text-[10px]">
-                                        {assignment.user.jobCategory.nameHe || assignment.user.jobCategory.name}
-                                      </Badge>
-                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Users className="h-3 w-3" />
+                                    {shiftGroup.workers.length} עובדים: {shiftGroup.workers.map((w: any) => w.firstName).join(', ')}
                                   </div>
                                 </div>
 
-                                {/* Shift Revenue & Tips - for all shifts */}
-                                {true ? (
-                                  <div className="flex-1">
-                                    <div className="grid grid-cols-5 gap-2 items-end">
-                                      {/* Sitting Revenue */}
-                                      <div className="space-y-1">
-                                        <Label className="text-[10px] font-medium flex items-center gap-0.5 text-blue-600">
-                                          <Utensils className="h-2.5 w-2.5" />
-                                          ישיבה ₪
-                                        </Label>
-                                        <Input
-                                          type="number"
-                                          placeholder="0"
-                                          value={sittingRevenue[assignment.id] || ''}
-                                          onChange={(e) => setSittingRevenue(prev => ({
-                                            ...prev,
-                                            [assignment.id]: e.target.value
-                                          }))}
-                                          className="h-9 text-sm"
-                                          min="0"
-                                        />
-                                      </div>
-                                      
-                                      {/* Takeaway Revenue */}
-                                      <div className="space-y-1">
-                                        <Label className="text-[10px] font-medium flex items-center gap-0.5 text-purple-600">
-                                          <Receipt className="h-2.5 w-2.5" />
-                                          TA ₪
-                                        </Label>
-                                        <Input
-                                          type="number"
-                                          placeholder="0"
-                                          value={takeawayRevenue[assignment.id] || ''}
-                                          onChange={(e) => setTakeawayRevenue(prev => ({
-                                            ...prev,
-                                            [assignment.id]: e.target.value
-                                          }))}
-                                          className="h-9 text-sm"
-                                          min="0"
-                                        />
-                                      </div>
-                                      
-                                      {/* Delivery Revenue */}
-                                      <div className="space-y-1">
-                                        <Label className="text-[10px] font-medium flex items-center gap-0.5 text-orange-600">
-                                          <Clock className="h-2.5 w-2.5" />
-                                          משלוחים ₪
-                                        </Label>
-                                        <Input
-                                          type="number"
-                                          placeholder="0"
-                                          value={deliveryRevenue[assignment.id] || ''}
-                                          onChange={(e) => setDeliveryRevenue(prev => ({
-                                            ...prev,
-                                            [assignment.id]: e.target.value
-                                          }))}
-                                          className="h-9 text-sm"
-                                          min="0"
-                                        />
-                                      </div>
-                                      
-                                      {/* Tips (separate) */}
-                                      <div className="space-y-1">
-                                        <Label className="text-[10px] font-medium flex items-center gap-0.5 text-amber-600">
-                                          <Coins className="h-2.5 w-2.5" />
-                                          טיפ ₪
-                                        </Label>
-                                        <Input
-                                          type="number"
-                                          placeholder="0"
-                                          value={tips[assignment.id] || ''}
-                                          onChange={(e) => setTips(prev => ({
-                                            ...prev,
-                                            [assignment.id]: e.target.value
-                                          }))}
-                                          className="h-9 text-sm"
-                                          min="0"
-                                        />
-                                      </div>
-                                      
-                                      {/* Save Button */}
-                                      <div className="space-y-1">
-                                        <Label className="text-[10px] font-medium text-emerald-600">
-                                          סה״כ: ₪{(
-                                            (parseFloat(sittingRevenue[assignment.id] || '0') +
-                                             parseFloat(takeawayRevenue[assignment.id] || '0') +
-                                             parseFloat(deliveryRevenue[assignment.id] || '0') +
-                                             parseFloat(tips[assignment.id] || '0'))
-                                          ).toFixed(0)}
-                                        </Label>
-                                        <Button 
-                                          size="sm"
-                                          onClick={() => handleSaveShiftData(assignment.id)}
-                                          disabled={savingData === assignment.id}
-                                          className="h-9 w-full"
-                                        >
-                                          {savingData === assignment.id ? (
-                                            <motion.div 
-                                              className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
-                                              animate={{ rotate: 360 }}
-                                              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                                            />
-                                          ) : (
-                                            <>
-                                              <Save className="h-3 w-3 ml-1" />
-                                              שמור
-                                            </>
-                                          )}
-                                        </Button>
-                                      </div>
+                                    {/* Sitting Revenue */}
+                                    <div className="space-y-2">
+                                      <Label className="text-sm font-medium flex items-center gap-1 text-blue-600">
+                                        <Utensils className="h-3 w-3" />
+                                        ישיבה (₪)
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        placeholder="0"
+                                        value={sittingRevenue[shiftKey] || ''}
+                                        onChange={(e) => setSittingRevenue(prev => ({
+                                          ...prev,
+                                          [shiftKey]: e.target.value
+                                        }))}
+                                        className="h-10"
+                                        min="0"
+                                      />
+                                    </div>
+                                    
+                                    {/* Takeaway Revenue */}
+                                    <div className="space-y-2">
+                                      <Label className="text-sm font-medium flex items-center gap-1 text-purple-600">
+                                        <Receipt className="h-3 w-3" />
+                                        TA (₪)
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        placeholder="0"
+                                        value={takeawayRevenue[shiftKey] || ''}
+                                        onChange={(e) => setTakeawayRevenue(prev => ({
+                                          ...prev,
+                                          [shiftKey]: e.target.value
+                                        }))}
+                                        className="h-10"
+                                        min="0"
+                                      />
+                                    </div>
+                                    
+                                    {/* Delivery Revenue */}
+                                    <div className="space-y-2">
+                                      <Label className="text-sm font-medium flex items-center gap-1 text-orange-600">
+                                        <Clock className="h-3 w-3" />
+                                        משלוחים (₪)
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        placeholder="0"
+                                        value={deliveryRevenue[shiftKey] || ''}
+                                        onChange={(e) => setDeliveryRevenue(prev => ({
+                                          ...prev,
+                                          [shiftKey]: e.target.value
+                                        }))}
+                                        className="h-10"
+                                        min="0"
+                                      />
+                                    </div>
+                                    
+                                    {/* Tips */}
+                                    <div className="space-y-2">
+                                      <Label className="text-sm font-medium flex items-center gap-1 text-amber-600">
+                                        <Coins className="h-3 w-3" />
+                                        טיפ (₪)
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        placeholder="0"
+                                        value={tips[shiftKey] || ''}
+                                        onChange={(e) => setTips(prev => ({
+                                          ...prev,
+                                          [shiftKey]: e.target.value
+                                        }))}
+                                        className="h-10"
+                                        min="0"
+                                      />
                                     </div>
                                   </div>
-                                ) : null}
+                                  
+                                  {/* Total and Save */}
+                                  <div className="flex items-center justify-between pt-3 border-t">
+                                    <div className="text-lg font-bold text-emerald-600">
+                                      סה״כ: {formatCurrency(
+                                        (parseFloat(sittingRevenue[shiftKey] || '0') +
+                                         parseFloat(takeawayRevenue[shiftKey] || '0') +
+                                         parseFloat(deliveryRevenue[shiftKey] || '0') +
+                                         parseFloat(tips[shiftKey] || '0'))
+                                      )}
+                                    </div>
+                                    <Button 
+                                      size="lg"
+                                      onClick={() => handleSaveShiftData(date, shiftGroup.shiftType, shiftGroup.assignmentIds)}
+                                      disabled={savingData === shiftKey}
+                                      className="h-10 px-6"
+                                    >
+                                      {savingData === shiftKey ? (
+                                        <motion.div 
+                                          className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                                          animate={{ rotate: 360 }}
+                                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                        />
+                                      ) : (
+                                        <>
+                                          <Save className="h-4 w-4 ml-2" />
+                                          שמור
+                                        </>
+                                      )}
+                                    </Button>
+                                  </div>
+                                </div>
                               </div>
                             )
                           })}
