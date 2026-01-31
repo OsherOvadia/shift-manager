@@ -4,7 +4,7 @@ services:
     env: node
     region: oregon
     plan: free
-    buildCommand: cp prisma/schema.production.prisma prisma/schema.prisma && npm install && npx prisma generate && npm run build
+    buildCommand: cp prisma/schema.production.prisma prisma/schema.prisma && npm install && npx prisma migrate deploy && npx prisma generate && npm run build
     startCommand: npm run start:prod
     healthCheckPath: /api
     envVars:
