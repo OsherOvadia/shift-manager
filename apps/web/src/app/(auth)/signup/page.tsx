@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
-import { Calendar, Loader2, CheckCircle } from 'lucide-react'
+import { Logo } from '@/components/logo'
+import { Loader2, CheckCircle } from 'lucide-react'
 
 const signupSchema = z.object({
   firstName: z.string().min(2, 'שם פרטי חייב להכיל לפחות 2 תווים'),
@@ -91,7 +92,7 @@ export default function SignupPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto p-3 bg-primary rounded-xl w-fit mb-4">
-            <Calendar className="h-8 w-8 text-primary-foreground" />
+            <Logo size="lg" className="h-8 w-8 text-primary-foreground" />
           </div>
           <CardTitle className="text-2xl">הרשמה למערכת</CardTitle>
           <CardDescription>

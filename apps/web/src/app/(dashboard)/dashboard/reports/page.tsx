@@ -20,6 +20,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
+import { ComparisonMetric } from '@/components/comparison-metric'
+import { cn } from '@/lib/utils'
 import {
   ChevronRight,
   ChevronLeft,
@@ -31,6 +33,7 @@ import {
   Edit,
   Coins,
   PieChart,
+  BarChart3,
 } from 'lucide-react'
 import { 
   PageTransition, 
@@ -49,14 +52,24 @@ export default function ReportsPage() {
   const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null)
   const [revenueAmount, setRevenueAmount] = useState('')
   const [tipsAmount, setTipsAmount] = useState<{ [key: string]: string }>({})
+  const [showComparison, setShowComparison] = useState(true)
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const { accessToken } = useAuthStore()
+
+  const prevWeekStart = subWeeks(weekStart, 1)
 
   const { data: report, isLoading, isFetching, error } = useQuery({
     queryKey: ['weekly-costs', weekStart.toISOString()],
     queryFn: () => api.get(`/reports/weekly-costs?date=${weekStart.toISOString()}`, accessToken!),
     enabled: !!accessToken,
+    staleTime: 1000 * 60 * 5,
+  })
+
+  const { data: prevWeekReport } = useQuery({
+    queryKey: ['weekly-costs', prevWeekStart.toISOString()],
+    queryFn: () => api.get(`/reports/weekly-costs?date=${prevWeekStart.toISOString()}`, accessToken!),
+    enabled: !!accessToken && showComparison,
     staleTime: 1000 * 60 * 5,
   })
 
@@ -351,6 +364,56 @@ export default function ReportsPage() {
               </StaggerItem>
             </StaggerContainer>
 
+            {/* Week vs Week Comparison */}
+            {prevWeekReport && (
+              <Card>
+                <CardHeader className="p-3 sm:p-4 pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                      השוואה לשבוע שעבר
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowComparison(!showComparison)}
+                      className="text-xs"
+                    >
+                      {showComparison ? 'הסתר' : 'הצג'}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-3 sm:p-4 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <ComparisonMetric
+                      label="הכנסות"
+                      current={report.summary.totalRevenue || 0}
+                      previous={prevWeekReport.summary?.totalRevenue}
+                      format="currency"
+                    />
+                    <ComparisonMetric
+                      label="עלות שכר"
+                      current={report.summary.totalCost || 0}
+                      previous={prevWeekReport.summary?.totalCost}
+                      format="currency"
+                    />
+                    <ComparisonMetric
+                      label="טיפים"
+                      current={report.summary.totalTips || 0}
+                      previous={prevWeekReport.summary?.totalTips}
+                      format="currency"
+                    />
+                    <ComparisonMetric
+                      label="רווח"
+                      current={report.summary.profitMargin || 0}
+                      previous={prevWeekReport.summary?.profitMargin}
+                      format="percentage"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Cost by Category */}
             <Card>
               <CardHeader className="p-3 sm:p-4">
@@ -442,22 +505,25 @@ export default function ReportsPage() {
                           </div>
                         </div>
                         {emp.user.isTipBased && (
-                          <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
-                            <div className="flex justify-between">
-                              <span>שכר בסיס:</span>
-                              <span>{emp.user.baseHourlyWage?.toFixed(0)} ₪/שעה</span>
+                          <div className="mt-2 pt-2 border-t border-border/50 text-xs space-y-1">
+                            <div className="flex justify-between text-muted-foreground">
+                              <span>שכר בסיס ({emp.user.baseHourlyWage} ₪ × {emp.totalHours.toFixed(1)} שעות):</span>
+                              <span className="font-medium">{formatCurrency(emp.baseWageTotal || 0)}</span>
                             </div>
-                            <div className="flex justify-between">
-                              <span>טיפים לשעה:</span>
-                              <span className="text-amber-600">
-                                {emp.totalHours > 0 ? (emp.totalTips / emp.totalHours).toFixed(0) : 0} ₪/שעה
-                              </span>
+                            <div className="flex justify-between text-amber-600">
+                              <span>טיפים שהתקבלו:</span>
+                              <span className="font-medium">+{formatCurrency(emp.totalTips)}</span>
                             </div>
-                            <div className="flex justify-between font-medium">
-                              <span>תשלום מנהל:</span>
-                              <span className={emp.tipsCoverSalary ? 'text-green-600' : 'text-orange-600'}>
+                            <div className="flex justify-between text-muted-foreground">
+                              <span>תשלום נדרש ממנהל:</span>
+                              <span className={cn("font-medium", emp.tipsCoverSalary ? 'text-green-600' : 'text-orange-600')}>
                                 {emp.tipsCoverSalary ? '₪0 (טיפים מכסים)' : formatCurrency(emp.managerPayment)}
                               </span>
+                            </div>
+                            <div className="h-px bg-border my-1"></div>
+                            <div className="flex justify-between font-bold text-foreground">
+                              <span>סה״כ תשלום לעובד:</span>
+                              <span>{formatCurrency(emp.totalWorkerPayment || emp.baseWageTotal || 0)}</span>
                             </div>
                           </div>
                         )}

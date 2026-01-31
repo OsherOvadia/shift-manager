@@ -15,7 +15,8 @@ import { useToast } from '@/components/ui/use-toast'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { Calendar, Loader2 } from 'lucide-react'
+import { Logo } from '@/components/logo'
+import { Loader2 } from 'lucide-react'
 
 const loginSchema = z.object({
   email: z.string().email('כתובת אימייל לא תקינה'),
@@ -93,7 +94,7 @@ export default function LoginPage() {
         <CardHeader className="text-center space-y-2 pb-4">
           <div className="flex justify-center mb-2">
             <div className="p-3 sm:p-4 bg-primary rounded-2xl">
-              <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-primary-foreground" />
+              <Logo size="lg" className="h-6 w-6 sm:h-8 sm:w-8 text-primary-foreground" />
             </div>
           </div>
           <CardTitle className="text-xl sm:text-2xl">מנהל משמרות</CardTitle>

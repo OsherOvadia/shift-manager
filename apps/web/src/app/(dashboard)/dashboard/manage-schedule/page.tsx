@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -66,6 +66,7 @@ export default function ManageSchedulePage() {
     queryKey: ['employees'],
     queryFn: () => api.get<any[]>('/users/employees', accessToken!),
     enabled: !!accessToken,
+    staleTime: 5 * 60 * 1000, // 5 minutes - static data
   })
 
   // Fetch shift templates
@@ -73,6 +74,7 @@ export default function ManageSchedulePage() {
     queryKey: ['shift-templates'],
     queryFn: () => api.get<any[]>('/shift-templates/active', accessToken!),
     enabled: !!accessToken,
+    staleTime: 5 * 60 * 1000, // 5 minutes - static data
   })
 
   // Fetch schedules
@@ -80,6 +82,7 @@ export default function ManageSchedulePage() {
     queryKey: ['schedules'],
     queryFn: () => api.get<any[]>('/schedules', accessToken!),
     enabled: !!accessToken,
+    staleTime: 2 * 60 * 1000, // 2 minutes
   })
 
   // Fetch availability submissions for the week
@@ -87,6 +90,7 @@ export default function ManageSchedulePage() {
     queryKey: ['availability-submissions', targetWeekStart.toISOString()],
     queryFn: () => api.get<any[]>(`/availability/week/${targetWeekStart.toISOString()}/all`, accessToken!),
     enabled: !!accessToken,
+    staleTime: 3 * 60 * 1000, // 3 minutes
   })
 
   // Find or create schedule for current week
@@ -98,16 +102,8 @@ export default function ManageSchedulePage() {
     scheduleDate.setHours(0, 0, 0, 0)
     targetDate.setHours(0, 0, 0, 0)
     
-    const match = scheduleDate.getTime() === targetDate.getTime()
-    console.log('🗓️ Schedule comparison:', {
-      scheduleDate: scheduleDate.toISOString().split('T')[0],
-      targetDate: targetDate.toISOString().split('T')[0],
-      match
-    })
-    return match
+    return scheduleDate.getTime() === targetDate.getTime()
   })
-
-  console.log('📋 Current schedule found:', currentSchedule ? 'YES' : 'NO', currentSchedule?.id)
 
   // Fetch schedule details
   const { data: scheduleDetails, isLoading: detailsLoading } = useQuery({
@@ -130,7 +126,6 @@ export default function ManageSchedulePage() {
     onError: async (error: any) => {
       // If schedule already exists, just refresh the data
       if (error.message?.includes('כבר קיים')) {
-        console.log('⚠️ Schedule already exists, refreshing data...')
         toast({
           title: 'לוח משמרות כבר קיים',
           description: 'טוען את הלוח הקיים...',
@@ -203,11 +198,12 @@ export default function ManageSchedulePage() {
     },
   })
 
-  // Check conflicts
+  // Check conflicts (only for draft schedules)
   const { data: conflicts } = useQuery({
     queryKey: ['conflicts', currentSchedule?.id],
     queryFn: () => api.get<any[]>(`/assignments/conflicts?scheduleId=${currentSchedule!.id}`, accessToken!),
-    enabled: !!currentSchedule?.id && !!accessToken,
+    enabled: !!currentSchedule?.id && !!accessToken && currentSchedule.status === 'DRAFT',
+    staleTime: 1 * 60 * 1000, // 1 minute
   })
 
   const isLoading = schedulesLoading || detailsLoading
@@ -268,34 +264,34 @@ export default function ManageSchedulePage() {
     return shiftTemplates?.find((t) => t.shiftType === shiftType)
   }
 
+  // Memoize availability map for better performance
+  const availabilityMap = useMemo(() => {
+    const map = new Map<string, Set<string>>()
+    availabilitySubmissions?.forEach((submission: any) => {
+      submission.slots?.forEach((slot: any) => {
+        const slotDate = slot.shiftDate.split('T')[0]
+        const key = `${slotDate}_${slot.shiftType}`
+        if (!map.has(key)) {
+          map.set(key, new Set())
+        }
+        map.get(key)!.add(submission.userId)
+      })
+    })
+    return map
+  }, [availabilitySubmissions])
+
   // Get employees sorted by availability for a specific date/shift
   const getEmployeesForShift = (date: Date, shiftType: string) => {
     if (!employees) return []
     
-    const dateStr = formatDateLocal(date) // Use local date format
-    
-    console.log('🔍 Getting employees for shift:', dateStr, shiftType)
-    
-    // Find employees who submitted availability for this specific shift
-    const employeesWithAvailability: string[] = []
-    availabilitySubmissions?.forEach((submission: any) => {
-      submission.slots?.forEach((slot: any) => {
-        // Slot date is already in YYYY-MM-DD format from backend
-        const slotDate = slot.shiftDate.split('T')[0]
-        console.log('  Checking slot:', slotDate, slot.shiftType, 'for user:', submission.userId)
-        if (slotDate === dateStr && slot.shiftType === shiftType) {
-          console.log('  ✓ Match! User has availability:', submission.userId)
-          employeesWithAvailability.push(submission.userId)
-        }
-      })
-    })
-
-    console.log('📋 Employees with availability:', employeesWithAvailability)
+    const dateStr = formatDateLocal(date)
+    const key = `${dateStr}_${shiftType}`
+    const employeesWithAvailability = availabilityMap.get(key) || new Set()
 
     // Sort: employees with availability first, then others
     return [...employees].sort((a, b) => {
-      const aHasAvailability = employeesWithAvailability.includes(a.id)
-      const bHasAvailability = employeesWithAvailability.includes(b.id)
+      const aHasAvailability = employeesWithAvailability.has(a.id)
+      const bHasAvailability = employeesWithAvailability.has(b.id)
       
       if (aHasAvailability && !bHasAvailability) return -1
       if (!aHasAvailability && bHasAvailability) return 1
@@ -305,21 +301,12 @@ export default function ManageSchedulePage() {
     })
   }
 
-  // Check if an employee submitted availability for a specific shift
+  // Check if an employee submitted availability for a specific shift (optimized)
   const hasAvailability = (userId: string, date: Date, shiftType: string) => {
-    if (!availabilitySubmissions) return false
-    
-    const dateStr = formatDateLocal(date) // Use local date format
-    
-    return availabilitySubmissions.some((submission: any) => {
-      if (submission.userId !== userId) return false
-      
-      return submission.slots?.some((slot: any) => {
-        // Slot date is already in YYYY-MM-DD format from backend
-        const slotDate = slot.shiftDate.split('T')[0]
-        return slotDate === dateStr && slot.shiftType === shiftType
-      })
-    })
+    const dateStr = formatDateLocal(date)
+    const key = `${dateStr}_${shiftType}`
+    const employeesWithAvailability = availabilityMap.get(key)
+    return employeesWithAvailability?.has(userId) || false
   }
 
   return (

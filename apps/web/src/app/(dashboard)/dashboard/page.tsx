@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { useAuthStore, isManager } from '@/lib/auth'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
@@ -64,6 +65,17 @@ export default function DashboardPage() {
   const totalEmployees = employees?.length || 0
   const pendingAvailability = allAvailability?.filter((a: any) => a.status === 'PENDING' || !a.submittedAt).length || 0
   const availabilityStatus = myAvailability?.status || 'NOT_SUBMITTED'
+
+  // Identify employees who haven't submitted availability for next week
+  const employeesWithoutAvailability = useMemo(() => {
+    if (!employees || !allAvailability || !isManagerRole) return []
+    
+    const submittedUserIds = new Set(
+      allAvailability.map((a: any) => a.userId || a.user?.id).filter(Boolean)
+    )
+    
+    return employees.filter(emp => !submittedUserIds.has(emp.id))
+  }, [employees, allAvailability, isManagerRole])
 
   const getGreeting = () => {
     const hour = new Date().getHours()
@@ -296,6 +308,47 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+
+        {/* Missing Availability Submissions - for managers only */}
+        {isManagerRole && employeesWithoutAvailability.length > 0 && (
+          <Card className="border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/20">
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="text-base flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                <AlertTriangle className="h-5 w-5" />
+                עובדים שטרם הגישו זמינות לשבוע הבא
+              </CardTitle>
+              <CardDescription className="text-orange-600/80 dark:text-orange-500/80">
+                {employeesWithoutAvailability.length} עובדים טרם הגישו זמינות
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[200px] overflow-y-auto">
+                {employeesWithoutAvailability.map((emp: any) => (
+                  <div 
+                    key={emp.id}
+                    className="flex items-center justify-between p-2 bg-background rounded-lg border border-orange-200 dark:border-orange-800"
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm truncate">
+                          {emp.firstName} {emp.lastName}
+                        </div>
+                        {emp.jobCategory && (
+                          <div className="text-xs text-muted-foreground truncate">
+                            {emp.jobCategory.nameHe || emp.jobCategory.name}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-xs text-orange-600 border-orange-300 flex-shrink-0">
+                      טרם הגיש
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* User Info Card */}
         <Card>

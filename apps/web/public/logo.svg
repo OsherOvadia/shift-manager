@@ -1,0 +1,25 @@
+<!-- 
+  PLACEHOLDER LOGO
+  
+  To replace this placeholder with your actual logo:
+  1. Replace this file with your logo SVG or use a PNG/JPG file
+  2. If using PNG/JPG, update the Image src in components/logo.tsx
+  3. Recommended sizes: 40x40px (default), 32x32px (small), 48x48px (large)
+  4. For best results, use a transparent background
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <!-- Calendar icon as placeholder -->
+  <rect x="5" y="8" width="30" height="28" rx="3" fill="currentColor" opacity="0.1"/>
+  <rect x="5" y="8" width="30" height="7" rx="3" fill="currentColor" opacity="0.2"/>
+  <rect x="5" y="8" width="30" height="28" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>
+  
+  <!-- Calendar grid -->
+  <line x1="12" y1="20" x2="28" y2="20" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+  <line x1="12" y1="26" x2="28" y2="26" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+  <line x1="16" y1="18" x2="16" y2="32" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+  <line x1="24" y1="18" x2="24" y2="32" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+  
+  <!-- Top hooks -->
+  <line x1="13" y1="5" x2="13" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <line x1="27" y1="5" x2="27" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+</svg>

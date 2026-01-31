@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useAuthStore, isManager, isAdmin } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Logo } from '@/components/logo'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -119,7 +120,7 @@ export default function DashboardLayout({
           <div className="flex items-center gap-2 sm:gap-4">
             <Link href="/dashboard" className="flex items-center gap-2">
               <div className="p-1.5 sm:p-2 bg-primary rounded-lg">
-                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
+                <Logo size="sm" className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
               </div>
               <span className="font-bold text-sm sm:text-lg hidden xs:inline">מנהל משמרות</span>
             </Link>

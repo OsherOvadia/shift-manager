@@ -12,7 +12,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
 import { api } from '@/lib/api'
-import { Calendar, Loader2 } from 'lucide-react'
+import { Logo } from '@/components/logo'
+import { Loader2 } from 'lucide-react'
 
 const registerSchema = z.object({
   organizationName: z.string().min(2, 'שם העסק חייב להכיל לפחות 2 תווים'),
@@ -75,7 +76,7 @@ export default function RegisterPage() {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <div className="p-3 bg-primary rounded-full">
-              <Calendar className="h-8 w-8 text-primary-foreground" />
+              <Logo size="lg" className="h-8 w-8 text-primary-foreground" />
             </div>
           </div>
           <CardTitle className="text-2xl">יצירת ארגון חדש</CardTitle>

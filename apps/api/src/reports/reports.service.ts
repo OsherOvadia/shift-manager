@@ -74,6 +74,8 @@ export class ReportsService {
       totalTips: number;
       managerPayment: number;
       tipsCoverSalary: boolean;
+      baseWageTotal: number;
+      totalWorkerPayment: number;
       shifts: any[];
     }>();
 
@@ -117,6 +119,8 @@ export class ReportsService {
           totalTips: 0,
           managerPayment: 0,
           tipsCoverSalary: false,
+          baseWageTotal: 0,
+          totalWorkerPayment: 0,
           shifts: [],
         });
       }
@@ -126,8 +130,15 @@ export class ReportsService {
       record.totalCost += cost;
       record.totalTips += tips;
       record.managerPayment += managerPayment;
-      if (assignment.user.isTipBased) {
-        record.tipsCoverSalary = record.totalTips >= (assignment.user.baseHourlyWage || 0) * record.totalHours;
+      
+      // Calculate base wage total and total worker payment
+      if (assignment.user.isTipBased && assignment.user.baseHourlyWage) {
+        record.baseWageTotal = record.totalHours * assignment.user.baseHourlyWage;
+        record.totalWorkerPayment = record.baseWageTotal; // Tips are extra, not salary
+        record.tipsCoverSalary = record.totalTips >= record.baseWageTotal;
+      } else {
+        record.baseWageTotal = record.totalHours * assignment.user.hourlyWage;
+        record.totalWorkerPayment = record.baseWageTotal;
       }
       record.shifts.push({
         assignmentId: assignment.id,

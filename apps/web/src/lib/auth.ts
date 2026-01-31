@@ -77,13 +77,13 @@ export const useAuthStore = create<AuthState>()(
       // Custom storage that uses localStorage for "Remember Me" or sessionStorage for current session only
       storage: {
         getItem: (name) => {
-          // Check localStorage first (for "Remember Me")
-          const localData = localStorage.getItem(name)
-          if (localData) return localData
-          
-          // Then check sessionStorage (for current session only)
+          // Check sessionStorage first (most recent if both exist)
           const sessionData = sessionStorage.getItem(name)
-          return sessionData || null
+          if (sessionData) return sessionData
+          
+          // Then check localStorage (for "Remember Me")
+          const localData = localStorage.getItem(name)
+          return localData || null
         },
         setItem: (name, value) => {
           try {
