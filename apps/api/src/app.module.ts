@@ -13,6 +13,7 @@ import { SettingsModule } from './settings/settings.module';
 import { JobCategoriesModule } from './job-categories/job-categories.module';
 import { ReportsModule } from './reports/reports.module';
 import { DailyRevenuesModule } from './daily-revenues/daily-revenues.module';
+import { DatabaseResetModule } from './database/database-reset.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { DailyRevenuesModule } from './daily-revenues/daily-revenues.module';
     JobCategoriesModule,
     ReportsModule,
     DailyRevenuesModule,
+    DatabaseResetModule,
   ],
 })
 export class AppModule {}
