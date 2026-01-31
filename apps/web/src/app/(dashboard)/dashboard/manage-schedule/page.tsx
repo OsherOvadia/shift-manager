@@ -35,7 +35,7 @@ export default function ManageSchedulePage() {
   const queryClient = useQueryClient()
   const { accessToken } = useAuthStore()
   
-  const [weekOffset, setWeekOffset] = useState(1) // Default to next week
+  const [weekOffset, setWeekOffset] = useState(0) // Default to current week
   const [weekendDays, setWeekendDays] = useState<number[]>([4, 5, 6]) // Thu, Fri, Sat
   const [selectedShift, setSelectedShift] = useState<{ date: Date; shiftType: string } | null>(null)
   const [selectedWorkers, setSelectedWorkers] = useState<string[]>([])

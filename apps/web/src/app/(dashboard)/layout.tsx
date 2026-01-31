@@ -52,12 +52,13 @@ export default function DashboardLayout({
 }) {
   const router = useRouter()
   const pathname = usePathname()
-  const { user, isAuthenticated, logout, _hasHydrated } = useAuthStore()
+  const { user, isAuthenticated, logout, _hasHydrated, refreshToken, accessToken } = useAuthStore()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Wait for client-side mount
+  // Wait for client-side mount and attempt token refresh if needed
   useEffect(() => {
     setMounted(true)
     
@@ -65,6 +66,17 @@ export default function DashboardLayout({
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('auth-storage')
       console.log('💾 LocalStorage check:', stored ? 'has data' : 'empty')
+      
+      // If we have refreshToken but not authenticated, try to refresh immediately
+      if (stored && !isAuthenticated && refreshToken && !isRefreshing) {
+        console.log('🔄 Attempting immediate token refresh on mount')
+        setIsRefreshing(true)
+        import('./auth').then(({ refreshAccessToken }) => {
+          refreshAccessToken().finally(() => {
+            setIsRefreshing(false)
+          })
+        })
+      }
     }
   }, [])
 
@@ -74,13 +86,14 @@ export default function DashboardLayout({
       _hasHydrated, 
       isAuthenticated, 
       hasUser: !!user,
-      hasRefreshToken: !!useAuthStore.getState().refreshToken,
-      hasAccessToken: !!useAuthStore.getState().accessToken
+      isRefreshing,
+      hasRefreshToken: !!refreshToken,
+      hasAccessToken: !!accessToken
     })
     
-    // Wait for both mount and hydration
-    if (!mounted || !_hasHydrated) {
-      console.log('⏳ Still mounting/hydrating...')
+    // Wait for mount, hydration, AND token refresh
+    if (!mounted || !_hasHydrated || isRefreshing) {
+      console.log('⏳ Still mounting/hydrating/refreshing...')
       return
     }
     
@@ -101,13 +114,13 @@ export default function DashboardLayout({
       } else {
         console.log('✅ Authenticated, staying on page')
       }
-    }, 300) // Increased delay to ensure state is fully restored
+    }, 500) // Increased delay for token refresh
     
     return () => clearTimeout(timer)
-  }, [mounted, _hasHydrated, router])
+  }, [mounted, _hasHydrated, isRefreshing, router])
 
-  // Show loading while waiting for hydration and auth check
-  if (!mounted || !_hasHydrated || !authChecked) {
+  // Show loading while waiting for hydration, refresh, and auth check
+  if (!mounted || !_hasHydrated || isRefreshing || !authChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
