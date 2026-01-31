@@ -30,6 +30,15 @@ export class UpdateUserDto {
   @IsOptional()
   hourlyWage?: number;
 
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  baseHourlyWage?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  isTipBased?: boolean;
+
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
