@@ -551,44 +551,34 @@ export default function ReportsPage() {
                   {report.byDay.map((day: any, index: number) => (
                     <motion.div 
                       key={index} 
-                      className="p-2 bg-muted rounded-lg"
+                      className="p-3 sm:p-4 bg-gradient-to-br from-muted to-muted/50 rounded-lg border"
                       whileHover={{ scale: 1.02 }}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="text-xs font-medium">
+                      <div className="mb-2">
+                        <div className="text-sm sm:text-base font-bold text-center">
                           {format(new Date(day.date), 'EEE dd/MM', { locale: he })}
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5"
-                          onClick={() => openRevenueDialog(new Date(day.date))}
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
                       </div>
-                      <div className="space-y-1 text-xs">
-                        <div className="flex justify-between">
+                      <div className="space-y-2 text-sm sm:text-base">
+                        <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">הכנסה:</span>
-                          <span className="font-medium text-emerald-600">
+                          <span className="font-bold text-emerald-600 text-base sm:text-lg">
                             {day.revenue ? formatCurrency(day.revenue).replace('₪', '') : '-'}
                           </span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">טיפים:</span>
+                          <span className="font-bold text-blue-600 text-base sm:text-lg">
+                            {day.tips ? formatCurrency(day.tips).replace('₪', '') : '-'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">שכר:</span>
-                          <span className="font-medium text-red-600">
+                          <span className="font-bold text-red-600 text-base sm:text-lg">
                             {formatCurrency(day.totalCost).replace('₪', '')}
                           </span>
                         </div>
-                        {day.revenue > 0 && (
-                          <div className="flex justify-between text-[10px]">
-                            <span className="text-muted-foreground">אחוז שכר:</span>
-                            <span className={day.salaryPercentage > 50 ? 'text-red-600' : 'text-green-600'}>
-                              {day.salaryPercentage.toFixed(1)}%
-                            </span>
-                          </div>
-                        )}
-                        <div className="text-[10px] text-muted-foreground text-center pt-1 border-t">
+                        <div className="text-xs text-muted-foreground text-center pt-2 border-t">
                           {day.totalHours.toFixed(0)} שעות • {day.employeeCount} עובדים
                         </div>
                       </div>

@@ -273,24 +273,28 @@ export class ReportsService {
       totalTips += shiftRevenue.tips;
     }
     
-    // Calculate revenue by day
+    // Calculate revenue and tips by day
     const revenueByDay = new Map<string, number>();
+    const tipsByDay = new Map<string, number>();
     for (const [shiftKey, shiftRevenue] of revenueByShift) {
       const dateStr = shiftKey.split('_')[0];
       const revenue = shiftRevenue.sitting + shiftRevenue.takeaway + shiftRevenue.delivery;
       revenueByDay.set(dateStr, (revenueByDay.get(dateStr) || 0) + revenue);
+      tipsByDay.set(dateStr, (tipsByDay.get(dateStr) || 0) + shiftRevenue.tips);
     }
 
-    // Add revenue data to daily costs
+    // Add revenue and tips data to daily costs
     const dailyCostsWithRevenue = dailyCosts.map(day => {
       const dateKey = day.date.toISOString().split('T')[0];
       const revenue = revenueByDay.get(dateKey) || 0;
+      const tips = tipsByDay.get(dateKey) || 0;
       const profitMargin = revenue > 0 ? ((revenue - day.totalCost) / revenue) * 100 : 0;
       const salaryPercentage = revenue > 0 ? (day.totalCost / revenue) * 100 : 0;
       
       return {
         ...day,
         revenue,
+        tips,
         profitMargin,
         salaryPercentage,
       };
