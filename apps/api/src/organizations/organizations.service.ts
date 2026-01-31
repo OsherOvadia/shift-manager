@@ -11,7 +11,7 @@ export class OrganizationsService {
     const { name, adminEmail, adminPassword, adminFirstName, adminLastName } = createOrganizationDto;
 
     // Check if organization name already exists
-    const existingOrg = await this.prisma.organization.findUnique({
+    const existingOrg = await this.prisma.organization.findFirst({
       where: { name },
     });
 

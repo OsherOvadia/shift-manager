@@ -58,7 +58,7 @@ enum NotificationType {
 
 model Organization {
   id        String   @id @default(uuid())
-  name      String
+  name      String   @unique
   timezone  String   @default("Asia/Jerusalem")
   createdAt DateTime @default(now()) @map("created_at")
 
