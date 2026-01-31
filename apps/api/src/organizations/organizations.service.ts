@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import * as bcrypt from 'bcrypt';
@@ -9,6 +9,15 @@ export class OrganizationsService {
 
   async create(createOrganizationDto: CreateOrganizationDto) {
     const { name, adminEmail, adminPassword, adminFirstName, adminLastName } = createOrganizationDto;
+
+    // Check if organization name already exists
+    const existingOrg = await this.prisma.organization.findUnique({
+      where: { name },
+    });
+
+    if (existingOrg) {
+      throw new ConflictException('שם הארגון כבר קיים במערכת');
+    }
 
     // Create organization with admin user and default settings
     const isPostgres = process.env.DATABASE_URL?.includes('postgres');
