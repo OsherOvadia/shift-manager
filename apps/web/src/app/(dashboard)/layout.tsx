@@ -69,27 +69,42 @@ export default function DashboardLayout({
   }, [])
 
   useEffect(() => {
-    console.log('🔐 Auth check:', { mounted, _hasHydrated, isAuthenticated, hasUser: !!user })
+    console.log('🔐 Auth check:', { 
+      mounted, 
+      _hasHydrated, 
+      isAuthenticated, 
+      hasUser: !!user,
+      hasRefreshToken: !!useAuthStore.getState().refreshToken,
+      hasAccessToken: !!useAuthStore.getState().accessToken
+    })
     
     // Wait for both mount and hydration
     if (!mounted || !_hasHydrated) {
+      console.log('⏳ Still mounting/hydrating...')
       return
     }
     
-    // Give it a moment to fully hydrate before checking
+    // Give more time to fully hydrate before checking
     const timer = setTimeout(() => {
+      const state = useAuthStore.getState()
+      console.log('🔍 Final auth state:', {
+        isAuthenticated: state.isAuthenticated,
+        hasUser: !!state.user,
+        hasTokens: !!state.accessToken && !!state.refreshToken
+      })
+      
       setAuthChecked(true)
       
-      if (!isAuthenticated) {
+      if (!state.isAuthenticated || !state.user) {
         console.log('❌ Not authenticated after hydration, redirecting to login')
         router.push('/login')
       } else {
         console.log('✅ Authenticated, staying on page')
       }
-    }, 100) // Small delay to ensure state is fully restored
+    }, 300) // Increased delay to ensure state is fully restored
     
     return () => clearTimeout(timer)
-  }, [mounted, _hasHydrated, isAuthenticated, router])
+  }, [mounted, _hasHydrated, router])
 
   // Show loading while waiting for hydration and auth check
   if (!mounted || !_hasHydrated || !authChecked) {

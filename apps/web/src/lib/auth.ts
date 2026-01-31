@@ -139,6 +139,8 @@ export const useAuthStore = create<AuthState>()(
 export async function refreshAccessToken(): Promise<string | null> {
   let { refreshToken, rememberMe, setAuth, logout } = useAuthStore.getState()
 
+  console.log('🔄 Attempting token refresh...', { hasRefreshToken: !!refreshToken })
+
   // If no refresh token in state, try to get it from cookies
   if (!refreshToken && typeof document !== 'undefined') {
     const cookies = document.cookie.split(';').reduce((acc, cookie) => {
@@ -149,24 +151,30 @@ export async function refreshAccessToken(): Promise<string | null> {
     
     refreshToken = cookies.refreshToken || null
     rememberMe = cookies.rememberMe === 'true'
+    console.log('🍪 Restored from cookies:', { hasRefreshToken: !!refreshToken, rememberMe })
   }
 
   if (!refreshToken) {
-    logout()
+    console.log('❌ No refresh token, cannot refresh')
+    // Don't logout immediately - user might still have valid accessToken
     return null
   }
 
   try {
+    console.log('📡 Calling /auth/refresh...')
     const response = await api.post<{
       accessToken: string
       refreshToken: string
       user: User
     }>('/auth/refresh', { refreshToken })
 
+    console.log('✅ Token refreshed successfully')
     // Preserve the rememberMe setting when refreshing tokens
-    setAuth(response.user, response.accessToken, response.refreshToken, rememberMe)
+    setAuth(response.user, response.accessToken, response.refreshToken, true)
     return response.accessToken
-  } catch {
+  } catch (error) {
+    console.error('❌ Token refresh failed:', error)
+    // Only logout if refresh explicitly fails (not on network issues)
     logout()
     return null
   }

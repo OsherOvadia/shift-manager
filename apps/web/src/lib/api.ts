@@ -37,13 +37,17 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 
   // If unauthorized, try to refresh token and retry
   if (response.status === 401 && !skipAuth && !endpoint.includes('/auth/')) {
+    console.log('🔓 Got 401, attempting token refresh...')
     const newToken = await refreshAccessToken()
     if (newToken) {
+      console.log('✅ Token refreshed, retrying request')
       headers['Authorization'] = `Bearer ${newToken}`
       response = await fetch(`${API_URL}${endpoint}`, {
         ...fetchOptions,
         headers,
       })
+    } else {
+      console.log('❌ Token refresh failed')
     }
   }
 
