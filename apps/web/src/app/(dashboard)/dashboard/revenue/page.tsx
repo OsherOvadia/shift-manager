@@ -25,6 +25,7 @@ import {
   CalendarDays,
   Utensils,
   Receipt,
+  Calendar,
 } from 'lucide-react'
 import { 
   PageTransition, 
@@ -329,31 +330,40 @@ export default function RevenuePage() {
 
           {/* Week Navigation */}
           <motion.div 
-            className="flex items-center gap-2 bg-muted rounded-lg p-1"
+            className="flex items-center gap-2 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg p-2 shadow-sm"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3, delay: 0.1 }}
           >
             <ScaleOnTap>
-              <Button variant="ghost" size="icon" onClick={previousWeek} className="h-8 w-8">
-                <ChevronRight className="h-4 w-4" />
+              <Button variant="ghost" size="icon" onClick={previousWeek} className="h-10 w-10 hover:bg-primary/20">
+                <div className="flex items-center gap-1">
+                  <ChevronRight className="h-5 w-5" />
+                  <ChevronRight className="h-4 w-4 -mr-4" />
+                </div>
               </Button>
             </ScaleOnTap>
             <AnimatePresence mode="wait">
-              <motion.span 
+              <motion.div
                 key={weekStart.toISOString()}
-                className="min-w-[140px] sm:min-w-[180px] text-center text-xs sm:text-sm font-medium"
+                className="flex items-center gap-2 min-w-[140px] sm:min-w-[180px] justify-center px-2"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                {format(weekStart, 'dd MMM', { locale: he })} - {format(addDays(weekStart, 6), 'dd MMM yyyy', { locale: he })}
-              </motion.span>
+                <Calendar className="h-5 w-5 text-primary" />
+                <span className="text-sm sm:text-base font-bold text-primary">
+                  {format(weekStart, 'dd MMM', { locale: he })} - {format(addDays(weekStart, 6), 'dd MMM yyyy', { locale: he })}
+                </span>
+              </motion.div>
             </AnimatePresence>
             <ScaleOnTap>
-              <Button variant="ghost" size="icon" onClick={nextWeek} className="h-8 w-8">
-                <ChevronLeft className="h-4 w-4" />
+              <Button variant="ghost" size="icon" onClick={nextWeek} className="h-10 w-10 hover:bg-primary/20">
+                <div className="flex items-center gap-1">
+                  <ChevronLeft className="h-4 w-4 -ml-4" />
+                  <ChevronLeft className="h-5 w-5" />
+                </div>
               </Button>
             </ScaleOnTap>
           </motion.div>

@@ -167,9 +167,19 @@ export default function DashboardLayout({
       {/* Header */}
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-          {/* Right side - Menu button and Logo */}
+          {/* Left side - Logo */}
           <div className="flex items-center gap-2 sm:gap-4">
-            {/* Mobile menu button - Left side in RTL with hamburger icon */}
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <div className="p-1.5 sm:p-2 bg-primary rounded-lg">
+                <Logo size="sm" className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
+              </div>
+              <span className="font-bold text-sm sm:text-lg hidden xs:inline">מנהל משמרות</span>
+            </Link>
+          </div>
+
+          {/* Right side - Actions and Menu */}
+          <div className="flex items-center gap-1 sm:gap-2">
+            {/* Mobile menu button - Right side (left in RTL) with hamburger icon */}
             <Button
               variant="ghost"
               size="icon"
@@ -182,17 +192,6 @@ export default function DashboardLayout({
                 <div className="w-5 h-0.5 bg-foreground rounded-full"></div>
               </div>
             </Button>
-            
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="p-1.5 sm:p-2 bg-primary rounded-lg">
-                <Logo size="sm" className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
-              </div>
-              <span className="font-bold text-sm sm:text-lg hidden xs:inline">מנהל משמרות</span>
-            </Link>
-          </div>
-
-          {/* Left side - Actions */}
-          <div className="flex items-center gap-1 sm:gap-2">
             {/* Theme Toggle */}
             <ThemeToggle />
             
@@ -254,10 +253,10 @@ export default function DashboardLayout({
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-10 w-10" 
+              className="h-10 w-10 hover:bg-destructive/10" 
               onClick={() => setSidebarOpen(false)}
             >
-              <X className="h-6 w-6" />
+              <X className="h-6 w-6 text-destructive" />
             </Button>
           </div>
           
