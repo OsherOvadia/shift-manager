@@ -2,10 +2,11 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { format, startOfWeek, addWeeks, subWeeks, addDays } from 'date-fns'
+import { format, addWeeks, subWeeks, addDays } from 'date-fns'
 import { he } from 'date-fns/locale'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
+import { getWeekStartDate } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,7 +45,7 @@ const SHIFT_TYPES: Record<string, { label: string; color: string }> = {
 }
 
 export default function RevenuePage() {
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }))
+  const [weekStart, setWeekStart] = useState(() => getWeekStartDate(new Date()))
   const [selectedDay, setSelectedDay] = useState<number>(0)
   const [revenueInputs, setRevenueInputs] = useState<{ [key: string]: string }>({})
   const [sittingInputs, setSittingInputs] = useState<{ [key: string]: string }>({})
