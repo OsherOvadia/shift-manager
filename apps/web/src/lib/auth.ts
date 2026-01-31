@@ -21,9 +21,10 @@ interface AuthState {
   accessToken: string | null
   refreshToken: string | null
   isAuthenticated: boolean
+  rememberMe: boolean
   _hasHydrated: boolean
   setHasHydrated: (state: boolean) => void
-  setAuth: (user: User, accessToken: string, refreshToken: string) => void
+  setAuth: (user: User, accessToken: string, refreshToken: string, rememberMe?: boolean) => void
   logout: () => void
   updateUser: (user: Partial<User>) => void
 }
@@ -35,18 +36,20 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
+      rememberMe: true, // Default to true for persistence
       _hasHydrated: false,
 
       setHasHydrated: (state) => {
         set({ _hasHydrated: state })
       },
 
-      setAuth: (user, accessToken, refreshToken) => {
+      setAuth: (user, accessToken, refreshToken, rememberMe = true) => {
         set({
           user,
           accessToken,
           refreshToken,
           isAuthenticated: true,
+          rememberMe,
         })
       },
 
@@ -60,6 +63,7 @@ export const useAuthStore = create<AuthState>()(
           accessToken: null,
           refreshToken: null,
           isAuthenticated: false,
+          rememberMe: true,
         })
       },
 
@@ -70,7 +74,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      // Custom storage that checks both localStorage and sessionStorage
+      // Custom storage that uses localStorage for "Remember Me" or sessionStorage for current session only
       storage: {
         getItem: (name) => {
           // Check localStorage first (for "Remember Me")
@@ -82,8 +86,24 @@ export const useAuthStore = create<AuthState>()(
           return sessionData || null
         },
         setItem: (name, value) => {
-          // By default, save to localStorage (zustand persist does this)
-          localStorage.setItem(name, value)
+          try {
+            // Parse the value to check rememberMe flag
+            const parsedValue = JSON.parse(value)
+            const rememberMe = parsedValue.state?.rememberMe ?? true
+            
+            if (rememberMe) {
+              // Save to localStorage (persists across browser sessions)
+              localStorage.setItem(name, value)
+              sessionStorage.removeItem(name)
+            } else {
+              // Save to sessionStorage (cleared when browser closes)
+              sessionStorage.setItem(name, value)
+              localStorage.removeItem(name)
+            }
+          } catch {
+            // Fallback to localStorage if parsing fails
+            localStorage.setItem(name, value)
+          }
         },
         removeItem: (name) => {
           localStorage.removeItem(name)
@@ -98,7 +118,7 @@ export const useAuthStore = create<AuthState>()(
 )
 
 export async function refreshAccessToken(): Promise<string | null> {
-  const { refreshToken, setAuth, logout } = useAuthStore.getState()
+  const { refreshToken, rememberMe, setAuth, logout } = useAuthStore.getState()
 
   if (!refreshToken) {
     logout()
@@ -112,7 +132,8 @@ export async function refreshAccessToken(): Promise<string | null> {
       user: User
     }>('/auth/refresh', { refreshToken })
 
-    setAuth(response.user, response.accessToken, response.refreshToken)
+    // Preserve the rememberMe setting when refreshing tokens
+    setAuth(response.user, response.accessToken, response.refreshToken, rememberMe)
     return response.accessToken
   } catch {
     logout()

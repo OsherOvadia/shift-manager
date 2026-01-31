@@ -43,6 +43,13 @@ export class DailyRevenuesService {
     });
   }
 
+  async findAll(organizationId: string) {
+    return this.prisma.dailyRevenue.findMany({
+      where: { organizationId },
+      orderBy: { date: 'desc' },
+    });
+  }
+
   async findByDateRange(organizationId: string, startDate: Date, endDate: Date) {
     return this.prisma.dailyRevenue.findMany({
       where: {

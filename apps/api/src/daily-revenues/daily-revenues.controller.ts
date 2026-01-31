@@ -32,27 +32,33 @@ export class DailyRevenuesController {
     );
   }
 
-  @Get('range')
+  @Get()
   @Roles('ADMIN', 'MANAGER')
-  findByRange(
+  findByQuery(
     @Req() req: Request,
-    @Query('startDate') startDate: string,
-    @Query('endDate') endDate: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('date') date?: string,
   ) {
-    return this.dailyRevenuesService.findByDateRange(
-      (req as any).user.organizationId,
-      new Date(startDate),
-      new Date(endDate),
-    );
-  }
+    // If startDate and endDate are provided, return range
+    if (startDate && endDate) {
+      return this.dailyRevenuesService.findByDateRange(
+        (req as any).user.organizationId,
+        new Date(startDate),
+        new Date(endDate),
+      );
+    }
+    
+    // If single date is provided, return that date
+    if (date) {
+      return this.dailyRevenuesService.findOne(
+        (req as any).user.organizationId,
+        new Date(date),
+      );
+    }
 
-  @Get(':date')
-  @Roles('ADMIN', 'MANAGER')
-  findOne(@Req() req: Request, @Param('date') date: string) {
-    return this.dailyRevenuesService.findOne(
-      (req as any).user.organizationId,
-      new Date(date),
-    );
+    // Otherwise return all revenues for the organization
+    return this.dailyRevenuesService.findAll((req as any).user.organizationId);
   }
 
   @Patch(':id')
