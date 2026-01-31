@@ -206,7 +206,10 @@ model ShiftAssignment {
   shiftTemplateId String           @map("shift_template_id")
   shiftDate       DateTime         @map("shift_date") @db.Date
   status          AssignmentStatus @default(PENDING)
-  tipsEarned      Float?           @default(0) @map("tips_earned") // Tips earned during this shift
+  tipsEarned      Float?           @default(0) @map("tips_earned") // Total tips for this shift
+  sittingTips     Float?           @default(0) @map("sitting_tips") // Tips from dine-in
+  takeawayTips    Float?           @default(0) @map("takeaway_tips") // Tips from takeaway
+  deliveryTips    Float?           @default(0) @map("delivery_tips") // Tips from delivery
   createdAt       DateTime         @default(now()) @map("created_at")
 
   schedule      WeeklySchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)

@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "shift_assignments" 
+ADD COLUMN "sitting_tips" DOUBLE PRECISION DEFAULT 0,
+ADD COLUMN "takeaway_tips" DOUBLE PRECISION DEFAULT 0,
+ADD COLUMN "delivery_tips" DOUBLE PRECISION DEFAULT 0;

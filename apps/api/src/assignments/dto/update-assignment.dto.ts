@@ -9,4 +9,19 @@ export class UpdateAssignmentDto {
   @Min(0)
   @IsOptional()
   tipsEarned?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  sittingTips?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  takeawayTips?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  deliveryTips?: number;
 }

@@ -46,14 +46,9 @@ import {
 
 export default function ReportsPage() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }))
-  const [revenueDialogOpen, setRevenueDialogOpen] = useState(false)
-  const [tipsDialogOpen, setTipsDialogOpen] = useState(false)
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null)
-  const [revenueAmount, setRevenueAmount] = useState('')
-  const [tipsAmount, setTipsAmount] = useState<{ [key: string]: string }>({})
+  const [viewMode, setViewMode] = useState<'weekly' | 'monthly'>('weekly')
   const [showComparison, setShowComparison] = useState(true)
-  const { toast } = useToast()
+  const { toast} = useToast()
   const queryClient = useQueryClient()
   const { accessToken } = useAuthStore()
 

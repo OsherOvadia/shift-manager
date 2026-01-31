@@ -47,12 +47,9 @@ const SHIFT_TYPES: Record<string, { label: string; color: string }> = {
 export default function RevenuePage() {
   const [weekStart, setWeekStart] = useState(() => getWeekStartDate(new Date()))
   const [selectedDay, setSelectedDay] = useState<number>(0)
-  const [revenueInputs, setRevenueInputs] = useState<{ [key: string]: string }>({})
-  const [sittingInputs, setSittingInputs] = useState<{ [key: string]: string }>({})
-  const [takeawayInputs, setTakeawayInputs] = useState<{ [key: string]: string }>({})
-  const [deliveryInputs, setDeliveryInputs] = useState<{ [key: string]: string }>({})
-  const [tipsInputs, setTipsInputs] = useState<{ [key: string]: string }>({})
-  const [savingRevenue, setSavingRevenue] = useState<string | null>(null)
+  const [sittingTips, setSittingTips] = useState<{ [assignmentId: string]: string }>({})
+  const [takeawayTips, setTakeawayTips] = useState<{ [assignmentId: string]: string }>({})
+  const [deliveryTips, setDeliveryTips] = useState<{ [assignmentId: string]: string }>({})
   const [savingTips, setSavingTips] = useState<string | null>(null)
   const { toast } = useToast()
   const queryClient = useQueryClient()
@@ -96,78 +93,52 @@ export default function RevenuePage() {
     return formatDateLocal(date)
   }
 
-  // Initialize revenue inputs from fetched data
-  useEffect(() => {
-    if (revenueData && Array.isArray(revenueData)) {
-      const newRevenueInputs: { [key: string]: string } = {}
-      const newSittingInputs: { [key: string]: string } = {}
-      const newTakeawayInputs: { [key: string]: string } = {}
-      const newDeliveryInputs: { [key: string]: string } = {}
-      
-      revenueData.forEach((r: any) => {
-        const dateKey = getDateStr(r.date)
-        newRevenueInputs[dateKey] = r.totalRevenue.toString()
-        newSittingInputs[dateKey] = (r.sittingRevenue || 0).toString()
-        newTakeawayInputs[dateKey] = (r.takeawayRevenue || 0).toString()
-        newDeliveryInputs[dateKey] = (r.deliveryRevenue || 0).toString()
-      })
-      
-      setRevenueInputs(prev => ({ ...newRevenueInputs, ...prev }))
-      setSittingInputs(prev => ({ ...newSittingInputs, ...prev }))
-      setTakeawayInputs(prev => ({ ...newTakeawayInputs, ...prev }))
-      setDeliveryInputs(prev => ({ ...newDeliveryInputs, ...prev }))
-    }
-  }, [revenueData])
-
-  // Initialize tips inputs from schedule data
+  // Initialize tips from schedule data
   useEffect(() => {
     if (scheduleData?.shiftAssignments) {
-      const newInputs: { [key: string]: string } = {}
+      const newSitting: { [key: string]: string } = {}
+      const newTakeaway: { [key: string]: string } = {}
+      const newDelivery: { [key: string]: string } = {}
+      
       scheduleData.shiftAssignments.forEach((a: any) => {
-        if (a.tipsEarned && a.tipsEarned > 0) {
-          newInputs[a.id] = a.tipsEarned.toString()
-        }
+        if (a.sittingTips) newSitting[a.id] = a.sittingTips.toString()
+        if (a.takeawayTips) newTakeaway[a.id] = a.takeawayTips.toString()
+        if (a.deliveryTips) newDelivery[a.id] = a.deliveryTips.toString()
       })
-      setTipsInputs(prev => ({ ...newInputs, ...prev }))
+      
+      setSittingTips(prev => ({ ...newSitting, ...prev }))
+      setTakeawayTips(prev => ({ ...newTakeaway, ...prev }))
+      setDeliveryTips(prev => ({ ...newDelivery, ...prev }))
     }
   }, [scheduleData])
 
-  const saveDailyRevenueMutation = useMutation({
-    mutationFn: (data: { date: string; totalRevenue: number }) =>
-      api.post('/daily-revenues', data, accessToken!),
-    onSuccess: () => {
-      toast({
-        title: 'נשמר בהצלחה',
-        description: 'הכנסת היום נשמרה',
-      })
-      queryClient.invalidateQueries({ queryKey: ['daily-revenues'] })
-      setSavingRevenue(null)
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'שגיאה',
-        description: error.message || 'לא ניתן לשמור את ההכנסה',
-        variant: 'destructive',
-      })
-      setSavingRevenue(null)
-    },
-  })
-
   const updateTipsMutation = useMutation({
-    mutationFn: ({ assignmentId, tips }: { assignmentId: string; tips: number }) =>
-      api.patch(`/assignments/${assignmentId}`, { tipsEarned: tips }, accessToken!),
+    mutationFn: ({ assignmentId, sitting, takeaway, delivery, total }: { 
+      assignmentId: string; 
+      sitting: number; 
+      takeaway: number; 
+      delivery: number; 
+      total: number 
+    }) =>
+      api.patch(`/assignments/${assignmentId}`, { 
+        sittingTips: sitting,
+        takeawayTips: takeaway,
+        deliveryTips: delivery,
+        tipsEarned: total 
+      }, accessToken!),
     onSuccess: () => {
       toast({
         title: 'נשמר',
-        description: 'הטיפ נשמר בהצלחה',
+        description: 'טיפים נשמרו בהצלחה',
       })
       queryClient.invalidateQueries({ queryKey: ['schedule-week'] })
+      queryClient.invalidateQueries({ queryKey: ['weekly-costs'] })
       setSavingTips(null)
     },
     onError: (error: any) => {
       toast({
         title: 'שגיאה',
-        description: error.message || 'לא ניתן לשמור את הטיפ',
+        description: error.message || 'לא ניתן לשמור טיפים',
         variant: 'destructive',
       })
       setSavingTips(null)
@@ -185,11 +156,10 @@ export default function RevenuePage() {
     }).format(amount)
   }
 
-  const handleSaveRevenue = (date: Date) => {
-    const dateKey = formatDateLocal(date)
-    const sitting = parseFloat(sittingInputs[dateKey] || '0')
-    const takeaway = parseFloat(takeawayInputs[dateKey] || '0')
-    const delivery = parseFloat(deliveryInputs[dateKey] || '0')
+  const handleSaveTips = (assignmentId: string) => {
+    const sitting = parseFloat(sittingTips[assignmentId] || '0')
+    const takeaway = parseFloat(takeawayTips[assignmentId] || '0')
+    const delivery = parseFloat(deliveryTips[assignmentId] || '0')
     const total = sitting + takeaway + delivery
     
     if (isNaN(sitting) || isNaN(takeaway) || isNaN(delivery) || 
@@ -202,32 +172,13 @@ export default function RevenuePage() {
       return
     }
 
-    setSavingRevenue(dateKey)
-    saveDailyRevenueMutation.mutate({
-      date: dateKey,
-      totalRevenue: total,
-      sittingRevenue: sitting,
-      takeawayRevenue: takeaway,
-      deliveryRevenue: delivery,
-    })
-  }
-
-  const handleSaveTips = (assignmentId: string) => {
-    const amount = parseFloat(tipsInputs[assignmentId] || '0')
-    
-    if (isNaN(amount) || amount < 0) {
-      toast({
-        title: 'שגיאה',
-        description: 'אנא הזן סכום תקין',
-        variant: 'destructive',
-      })
-      return
-    }
-
     setSavingTips(assignmentId)
     updateTipsMutation.mutate({
       assignmentId,
-      tips: amount,
+      sitting,
+      takeaway,
+      delivery,
+      total,
     })
   }
 
@@ -251,27 +202,24 @@ export default function RevenuePage() {
 
   // Calculate totals for summary
   const weeklyTotals = useMemo(() => {
-    let totalRevenue = 0
     let totalSitting = 0
     let totalTakeaway = 0
     let totalDelivery = 0
     let totalTips = 0
     let totalShifts = 0
 
-    if (revenueData && Array.isArray(revenueData)) {
-      totalRevenue = revenueData.reduce((sum: number, r: any) => sum + (r.totalRevenue || 0), 0)
-      totalSitting = revenueData.reduce((sum: number, r: any) => sum + (r.sittingRevenue || 0), 0)
-      totalTakeaway = revenueData.reduce((sum: number, r: any) => sum + (r.takeawayRevenue || 0), 0)
-      totalDelivery = revenueData.reduce((sum: number, r: any) => sum + (r.deliveryRevenue || 0), 0)
-    }
-
     if (scheduleData?.shiftAssignments) {
-      totalTips = scheduleData.shiftAssignments.reduce((sum: number, a: any) => sum + (a.tipsEarned || 0), 0)
+      scheduleData.shiftAssignments.forEach((a: any) => {
+        totalSitting += a.sittingTips || 0
+        totalTakeaway += a.takeawayTips || 0
+        totalDelivery += a.deliveryTips || 0
+        totalTips += a.tipsEarned || 0
+      })
       totalShifts = scheduleData.shiftAssignments.filter((a: any) => a.status !== 'CANCELLED').length
     }
 
-    return { totalRevenue, totalSitting, totalTakeaway, totalDelivery, totalTips, totalShifts }
-  }, [revenueData, scheduleData])
+    return { totalSitting, totalTakeaway, totalDelivery, totalTips, totalShifts }
+  }, [scheduleData])
 
   const shiftsForSelectedDay = getShiftsForDate(selectedDate)
 
@@ -325,75 +273,63 @@ export default function RevenuePage() {
         </div>
 
         {/* Weekly Summary Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-          {/* Total Revenue Card */}
-          <Card className="bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border-emerald-200 dark:border-emerald-800">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Receipt className="h-5 w-5 text-emerald-600" />
-                <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">סה״כ הכנסות השבוע</span>
-              </div>
-              <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mb-3">
-                {formatCurrency(weeklyTotals.totalRevenue)}
-              </div>
-              
-              {/* Revenue Breakdown */}
-              <div className="space-y-2 pt-3 border-t border-emerald-200 dark:border-emerald-800">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-1.5 text-emerald-700/80 dark:text-emerald-400/80">
-                    <Utensils className="h-3 w-3" />
-                    ישיבה
-                  </span>
-                  <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                    {formatCurrency(weeklyTotals.totalSitting)}
-                  </span>
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <StaggerItem>
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30 border-blue-200 dark:border-blue-800">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Utensils className="h-4 w-4 text-blue-600" />
+                  <span className="text-xs text-blue-700 dark:text-blue-400">ישיבה</span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-1.5 text-emerald-700/80 dark:text-emerald-400/80">
-                    <Receipt className="h-3 w-3" />
-                    טייק אווי
-                  </span>
-                  <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                    {formatCurrency(weeklyTotals.totalTakeaway)}
-                  </span>
+                <div className="text-lg sm:text-xl font-bold text-blue-700 dark:text-blue-400">
+                  {formatCurrency(weeklyTotals.totalSitting)}
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-1.5 text-emerald-700/80 dark:text-emerald-400/80">
-                    <Clock className="h-3 w-3" />
-                    משלוחים
-                  </span>
-                  <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                    {formatCurrency(weeklyTotals.totalDelivery)}
-                  </span>
+              </CardContent>
+            </Card>
+          </StaggerItem>
+          
+          <StaggerItem>
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/30 dark:to-purple-900/30 border-purple-200 dark:border-purple-800">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Receipt className="h-4 w-4 text-purple-600" />
+                  <span className="text-xs text-purple-700 dark:text-purple-400">טייק אווי</span>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Tips and Shifts Card */}
-          <Card className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Coins className="h-5 w-5 text-amber-600" />
-                <span className="text-sm font-medium text-amber-700 dark:text-amber-400">טיפים ומשמרות</span>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <div className="text-xs text-amber-700/70 dark:text-amber-400/70 mb-1">סה״כ טיפים</div>
-                  <div className="text-xl font-bold text-amber-700 dark:text-amber-400">
-                    {formatCurrency(weeklyTotals.totalTips)}
-                  </div>
+                <div className="text-lg sm:text-xl font-bold text-purple-700 dark:text-purple-400">
+                  {formatCurrency(weeklyTotals.totalTakeaway)}
                 </div>
-                <div className="pt-3 border-t border-amber-200 dark:border-amber-800">
-                  <div className="text-xs text-amber-700/70 dark:text-amber-400/70 mb-1">סה״כ משמרות</div>
-                  <div className="text-xl font-bold text-amber-700 dark:text-amber-400">
-                    {weeklyTotals.totalShifts}
-                  </div>
+              </CardContent>
+            </Card>
+          </StaggerItem>
+          
+          <StaggerItem>
+            <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/30 dark:to-orange-900/30 border-orange-200 dark:border-orange-800">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Clock className="h-4 w-4 text-orange-600" />
+                  <span className="text-xs text-orange-700 dark:text-orange-400">משלוחים</span>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                <div className="text-lg sm:text-xl font-bold text-orange-700 dark:text-orange-400">
+                  {formatCurrency(weeklyTotals.totalDelivery)}
+                </div>
+              </CardContent>
+            </Card>
+          </StaggerItem>
+          
+          <StaggerItem>
+            <Card className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/30 dark:to-amber-900/30 border-amber-200 dark:border-amber-800">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Coins className="h-4 w-4 text-amber-600" />
+                  <span className="text-xs text-amber-700 dark:text-amber-400">סה״כ טיפים</span>
+                </div>
+                <div className="text-lg sm:text-xl font-bold text-amber-700 dark:text-amber-400">
+                  {formatCurrency(weeklyTotals.totalTips)}
+                </div>
+              </CardContent>
+            </Card>
+          </StaggerItem>
+        </StaggerContainer>
 
         {isLoading ? (
           <Card>
@@ -438,104 +374,6 @@ export default function RevenuePage() {
 
               {weekDates.map((date, index) => (
                 <TabsContent key={index} value={index.toString()} className="mt-4 space-y-4">
-                  {/* Daily Revenue Card */}
-                  <Card>
-                    <CardHeader className="p-4 pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Receipt className="h-5 w-5 text-emerald-500" />
-                        הכנסת קופה - יום {HEBREW_DAYS[date.getDay()]} {format(date, 'd בMMMM', { locale: he })}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-2 space-y-4">
-                      {/* Revenue Category Inputs */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium flex items-center gap-1">
-                            <Utensils className="h-3 w-3 text-blue-500" />
-                            ישיבה (₪)
-                          </Label>
-                          <Input
-                            type="number"
-                            placeholder="0"
-                            value={sittingInputs[formatDateLocal(date)] || ''}
-                            onChange={(e) => setSittingInputs(prev => ({
-                              ...prev,
-                              [formatDateLocal(date)]: e.target.value
-                            }))}
-                            className="h-10"
-                            min="0"
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium flex items-center gap-1">
-                            <Receipt className="h-3 w-3 text-purple-500" />
-                            טייק אווי (₪)
-                          </Label>
-                          <Input
-                            type="number"
-                            placeholder="0"
-                            value={takeawayInputs[formatDateLocal(date)] || ''}
-                            onChange={(e) => setTakeawayInputs(prev => ({
-                              ...prev,
-                              [formatDateLocal(date)]: e.target.value
-                            }))}
-                            className="h-10"
-                            min="0"
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium flex items-center gap-1">
-                            <Clock className="h-3 w-3 text-orange-500" />
-                            משלוחים (₪)
-                          </Label>
-                          <Input
-                            type="number"
-                            placeholder="0"
-                            value={deliveryInputs[formatDateLocal(date)] || ''}
-                            onChange={(e) => setDeliveryInputs(prev => ({
-                              ...prev,
-                              [formatDateLocal(date)]: e.target.value
-                            }))}
-                            className="h-10"
-                            min="0"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Total and Save */}
-                      <div className="flex items-center justify-between pt-2 border-t">
-                        <div className="text-lg font-bold text-emerald-600">
-                          סה״כ: {formatCurrency(
-                            (parseFloat(sittingInputs[formatDateLocal(date)] || '0') +
-                             parseFloat(takeawayInputs[formatDateLocal(date)] || '0') +
-                             parseFloat(deliveryInputs[formatDateLocal(date)] || '0'))
-                          )}
-                        </div>
-                        <Button 
-                          size="lg"
-                          onClick={() => handleSaveRevenue(date)}
-                          disabled={savingRevenue === formatDateLocal(date)}
-                          className="h-10 px-6"
-                        >
-                          {savingRevenue === formatDateLocal(date) ? (
-                            <motion.div 
-                              className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                            />
-                          ) : (
-                            <>
-                              <Save className="h-4 w-4 ml-2" />
-                              שמור
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-
                   {/* Shifts Tips Entry */}
                   <Card>
                     <CardHeader className="p-4 pb-2">
@@ -593,38 +431,95 @@ export default function RevenuePage() {
 
                                 {/* Tips Input - only for tip-based employees */}
                                 {isTipBased ? (
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-24">
-                                      <Input
-                                        type="number"
-                                        placeholder="טיפ ₪"
-                                        value={tipsInputs[assignment.id] || ''}
-                                        onChange={(e) => setTipsInputs(prev => ({
-                                          ...prev,
-                                          [assignment.id]: e.target.value
-                                        }))}
-                                        className="h-9 text-center"
-                                        min="0"
-                                      />
-                                    </div>
-                                    <Button 
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleSaveTips(assignment.id)}
-                                      disabled={savingTips === assignment.id}
-                                      className="h-9 w-9 p-0"
-                                      title="שמור טיפ"
-                                    >
-                                      {savingTips === assignment.id ? (
-                                        <motion.div 
-                                          className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full"
-                                          animate={{ rotate: 360 }}
-                                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                  <div className="flex-1">
+                                    <div className="grid grid-cols-4 gap-2 items-end">
+                                      {/* Sitting Tips */}
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px] font-medium flex items-center gap-0.5">
+                                          <Utensils className="h-2.5 w-2.5" />
+                                          ישיבה
+                                        </Label>
+                                        <Input
+                                          type="number"
+                                          placeholder="0"
+                                          value={sittingTips[assignment.id] || ''}
+                                          onChange={(e) => setSittingTips(prev => ({
+                                            ...prev,
+                                            [assignment.id]: e.target.value
+                                          }))}
+                                          className="h-9 text-sm"
+                                          min="0"
                                         />
-                                      ) : (
-                                        <Save className="h-4 w-4" />
-                                      )}
-                                    </Button>
+                                      </div>
+                                      
+                                      {/* Takeaway Tips */}
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px] font-medium flex items-center gap-0.5">
+                                          <Receipt className="h-2.5 w-2.5" />
+                                          TA
+                                        </Label>
+                                        <Input
+                                          type="number"
+                                          placeholder="0"
+                                          value={takeawayTips[assignment.id] || ''}
+                                          onChange={(e) => setTakeawayTips(prev => ({
+                                            ...prev,
+                                            [assignment.id]: e.target.value
+                                          }))}
+                                          className="h-9 text-sm"
+                                          min="0"
+                                        />
+                                      </div>
+                                      
+                                      {/* Delivery Tips */}
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px] font-medium flex items-center gap-0.5">
+                                          <Clock className="h-2.5 w-2.5" />
+                                          משלוחים
+                                        </Label>
+                                        <Input
+                                          type="number"
+                                          placeholder="0"
+                                          value={deliveryTips[assignment.id] || ''}
+                                          onChange={(e) => setDeliveryTips(prev => ({
+                                            ...prev,
+                                            [assignment.id]: e.target.value
+                                          }))}
+                                          className="h-9 text-sm"
+                                          min="0"
+                                        />
+                                      </div>
+                                      
+                                      {/* Total and Save Button */}
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px] font-medium text-amber-600">
+                                          סה״כ: ₪{(
+                                            (parseFloat(sittingTips[assignment.id] || '0') +
+                                             parseFloat(takeawayTips[assignment.id] || '0') +
+                                             parseFloat(deliveryTips[assignment.id] || '0'))
+                                          ).toFixed(0)}
+                                        </Label>
+                                        <Button 
+                                          size="sm"
+                                          onClick={() => handleSaveTips(assignment.id)}
+                                          disabled={savingTips === assignment.id}
+                                          className="h-9 w-full"
+                                        >
+                                          {savingTips === assignment.id ? (
+                                            <motion.div 
+                                              className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                                              animate={{ rotate: 360 }}
+                                              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                            />
+                                          ) : (
+                                            <>
+                                              <Save className="h-3 w-3 ml-1" />
+                                              שמור
+                                            </>
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </div>
                                   </div>
                                 ) : (
                                   <div className="text-xs text-muted-foreground px-3">
