@@ -4,24 +4,24 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 220 20% 97%; /* Subtle blue-gray background instead of pure white */
     --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
+    --card: 0 0% 100%; /* Cards stay white for contrast */
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
     --primary: 220 90% 56%; /* Vibrant blue for better contrast */
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 93%; /* Lighter gray for better readability */
+    --secondary: 220 30% 88%; /* More colorful secondary */
     --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 220 13% 96%; /* Very light muted */
-    --muted-foreground: 220 9% 40%; /* Darker for better contrast */
+    --muted: 220 25% 93%; /* Subtle blue tint instead of gray */
+    --muted-foreground: 220 9% 35%; /* Darker for better contrast */
     --accent: 37 91% 55%; /* Warm orange accent */
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 88%; /* Slightly darker border */
-    --input: 220 13% 94%; /* Lighter input background */
+    --border: 220 20% 85%; /* More visible border */
+    --input: 0 0% 100%; /* White input background for better contrast */
     --ring: 220 90% 56%;
     --radius: 0.75rem; /* Increased for modern look */
   }

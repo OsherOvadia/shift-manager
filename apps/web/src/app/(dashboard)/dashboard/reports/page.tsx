@@ -204,14 +204,17 @@ export default function ReportsPage() {
 
           {/* Week Navigation */}
           <motion.div 
-            className="flex items-center gap-2 bg-muted rounded-lg p-2"
+            className="flex items-center gap-2 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg p-2 shadow-sm"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3, delay: 0.1 }}
           >
             <ScaleOnTap>
-              <Button variant="ghost" size="icon" onClick={previousWeek} className="h-10 w-10">
-                <ChevronRight className="h-5 w-5" />
+              <Button variant="ghost" size="icon" onClick={previousWeek} className="h-10 w-10 hover:bg-primary/20">
+                <div className="flex items-center gap-1">
+                  <ChevronRight className="h-5 w-5" />
+                  <ChevronRight className="h-4 w-4 -mr-4" />
+                </div>
               </Button>
             </ScaleOnTap>
             <AnimatePresence mode="wait">
@@ -223,15 +226,18 @@ export default function ReportsPage() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm sm:text-base font-semibold">
+                <Calendar className="h-5 w-5 text-primary" />
+                <span className="text-sm sm:text-base font-bold text-primary">
                   {format(weekStart, 'dd/MM', { locale: he })} - {format(addWeeks(weekStart, 1), 'dd/MM/yy', { locale: he })}
                 </span>
               </motion.div>
             </AnimatePresence>
             <ScaleOnTap>
-              <Button variant="ghost" size="icon" onClick={nextWeek} className="h-10 w-10">
-                <ChevronLeft className="h-5 w-5" />
+              <Button variant="ghost" size="icon" onClick={nextWeek} className="h-10 w-10 hover:bg-primary/20">
+                <div className="flex items-center gap-1">
+                  <ChevronLeft className="h-4 w-4 -ml-4" />
+                  <ChevronLeft className="h-5 w-5" />
+                </div>
               </Button>
             </ScaleOnTap>
             {isFetching && (

@@ -169,14 +169,18 @@ export default function DashboardLayout({
         <div className="flex h-16 items-center justify-between px-4 sm:px-6">
           {/* Right side - Menu button and Logo */}
           <div className="flex items-center gap-2 sm:gap-4">
-            {/* Mobile menu button - Left side in RTL */}
+            {/* Mobile menu button - Left side in RTL with hamburger icon */}
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden h-10 w-10"
+              className="md:hidden h-11 w-11 hover:bg-primary/10"
               onClick={() => setSidebarOpen(true)}
             >
-              <Menu className="h-6 w-6" />
+              <div className="flex flex-col gap-1">
+                <div className="w-5 h-0.5 bg-foreground rounded-full"></div>
+                <div className="w-5 h-0.5 bg-foreground rounded-full"></div>
+                <div className="w-5 h-0.5 bg-foreground rounded-full"></div>
+              </div>
             </Button>
             
             <Link href="/dashboard" className="flex items-center gap-2">
