@@ -1,4 +1,16 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateDailyRevenueDto } from './create-daily-revenue.dto';
+import { IsDateString, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
-export class UpdateDailyRevenueDto extends PartialType(CreateDailyRevenueDto) {}
+export class UpdateDailyRevenueDto {
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  totalRevenue?: number;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}

@@ -10,6 +10,7 @@ import {
   Req,
   Query,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { DailyRevenuesService } from './daily-revenues.service';
 import { CreateDailyRevenueDto } from './dto/create-daily-revenue.dto';
 import { UpdateDailyRevenueDto } from './dto/update-daily-revenue.dto';
@@ -24,9 +25,9 @@ export class DailyRevenuesController {
 
   @Post()
   @Roles('ADMIN', 'MANAGER')
-  create(@Req() req, @Body() createDailyRevenueDto: CreateDailyRevenueDto) {
+  create(@Req() req: Request, @Body() createDailyRevenueDto: CreateDailyRevenueDto) {
     return this.dailyRevenuesService.create(
-      req.user.organizationId,
+      (req as any).user.organizationId,
       createDailyRevenueDto,
     );
   }
@@ -34,12 +35,12 @@ export class DailyRevenuesController {
   @Get('range')
   @Roles('ADMIN', 'MANAGER')
   findByRange(
-    @Req() req,
+    @Req() req: Request,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
     return this.dailyRevenuesService.findByDateRange(
-      req.user.organizationId,
+      (req as any).user.organizationId,
       new Date(startDate),
       new Date(endDate),
     );
@@ -47,9 +48,9 @@ export class DailyRevenuesController {
 
   @Get(':date')
   @Roles('ADMIN', 'MANAGER')
-  findOne(@Req() req, @Param('date') date: string) {
+  findOne(@Req() req: Request, @Param('date') date: string) {
     return this.dailyRevenuesService.findOne(
-      req.user.organizationId,
+      (req as any).user.organizationId,
       new Date(date),
     );
   }
@@ -57,20 +58,20 @@ export class DailyRevenuesController {
   @Patch(':id')
   @Roles('ADMIN', 'MANAGER')
   update(
-    @Req() req,
+    @Req() req: Request,
     @Param('id') id: string,
     @Body() updateDailyRevenueDto: UpdateDailyRevenueDto,
   ) {
     return this.dailyRevenuesService.update(
       id,
-      req.user.organizationId,
+      (req as any).user.organizationId,
       updateDailyRevenueDto,
     );
   }
 
   @Delete(':id')
   @Roles('ADMIN', 'MANAGER')
-  remove(@Req() req, @Param('id') id: string) {
-    return this.dailyRevenuesService.remove(id, req.user.organizationId);
+  remove(@Req() req: Request, @Param('id') id: string) {
+    return this.dailyRevenuesService.remove(id, (req as any).user.organizationId);
   }
 }

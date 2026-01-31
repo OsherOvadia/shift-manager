@@ -79,12 +79,13 @@ export class DailyRevenuesService {
       throw new NotFoundException('Daily revenue not found');
     }
 
+    const updateData: any = {};
+    if (dto.totalRevenue !== undefined) updateData.totalRevenue = dto.totalRevenue;
+    if (dto.notes !== undefined) updateData.notes = dto.notes;
+
     return this.prisma.dailyRevenue.update({
       where: { id },
-      data: {
-        totalRevenue: dto.totalRevenue,
-        notes: dto.notes,
-      },
+      data: updateData,
     });
   }
 
