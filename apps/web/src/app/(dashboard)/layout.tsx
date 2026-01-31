@@ -228,7 +228,7 @@ export default function DashboardLayout({
         </div>
       </header>
 
-      <div className="flex flex-row-reverse">
+      <div className="flex flex-row-reverse overflow-hidden">
         {/* Mobile Sidebar Overlay */}
         {sidebarOpen && (
           <div
@@ -242,7 +242,7 @@ export default function DashboardLayout({
           className={cn(
             'fixed md:sticky top-0 md:top-16 right-0 z-50 md:z-auto h-screen md:h-[calc(100vh-4rem)] w-72 sm:w-80 md:w-64 border-l bg-background shadow-2xl md:shadow-none transition-transform duration-300 ease-in-out',
             sidebarOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0',
-            'flex flex-col'
+            'flex flex-col md:block'
           )}
         >
           {/* Mobile header */}
