@@ -236,19 +236,52 @@ export class ReportsService {
       totalTips += record.totalTips;
     }
 
-    // Get daily revenues for the week
-    const dailyRevenues = await this.dailyRevenuesService.findByDateRange(
-      organizationId,
-      startDate,
-      endDate,
-    );
-
-    // Calculate total revenue and profit margin
+    // Calculate total revenue from shift assignments (sitting + takeaway + delivery)
+    // Group by shift to avoid counting same revenue multiple times
+    const revenueByShift = new Map<string, {
+      sitting: number;
+      takeaway: number;
+      delivery: number;
+      tips: number;
+    }>();
+    
+    for (const assignment of assignments) {
+      const dateStr = new Date(assignment.shiftDate).toISOString().split('T')[0];
+      const shiftType = assignment.shiftTemplate.shiftType === 'EVENING_CLOSE' 
+        ? 'EVENING' 
+        : assignment.shiftTemplate.shiftType;
+      const shiftKey = `${dateStr}_${shiftType}`;
+      
+      // Only count each shift once (first worker's data represents the whole shift)
+      if (!revenueByShift.has(shiftKey)) {
+        revenueByShift.set(shiftKey, {
+          sitting: assignment.sittingTips || 0,
+          takeaway: assignment.takeawayTips || 0,
+          delivery: assignment.deliveryTips || 0,
+          tips: assignment.tipsEarned || 0,
+        });
+      }
+    }
+    
+    // Calculate totals from unique shifts
     let totalRevenue = 0;
+    let totalRevenueFromShifts = 0;
+    let totalTipsFromShifts = 0;
+    
+    for (const [, shiftRevenue] of revenueByShift) {
+      totalRevenueFromShifts += shiftRevenue.sitting + shiftRevenue.takeaway + shiftRevenue.delivery;
+      totalTipsFromShifts += shiftRevenue.tips;
+    }
+    
+    totalRevenue = totalRevenueFromShifts;
+    totalTips = totalTipsFromShifts; // Use actual tips from shifts, not just employee earnings
+    
+    // Calculate revenue by day
     const revenueByDay = new Map<string, number>();
-    for (const revenue of dailyRevenues) {
-      totalRevenue += revenue.totalRevenue;
-      revenueByDay.set(revenue.date.toISOString().split('T')[0], revenue.totalRevenue);
+    for (const [shiftKey, shiftRevenue] of revenueByShift) {
+      const dateStr = shiftKey.split('_')[0];
+      const revenue = shiftRevenue.sitting + shiftRevenue.takeaway + shiftRevenue.delivery;
+      revenueByDay.set(dateStr, (revenueByDay.get(dateStr) || 0) + revenue);
     }
 
     // Add revenue data to daily costs

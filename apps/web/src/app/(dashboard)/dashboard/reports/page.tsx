@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { format, startOfWeek, addWeeks, subWeeks } from 'date-fns'
+import { format, addWeeks, subWeeks } from 'date-fns'
 import { he } from 'date-fns/locale'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
+import { getWeekStartDate } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,7 +46,7 @@ import {
 } from '@/components/ui/animations'
 
 export default function ReportsPage() {
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }))
+  const [weekStart, setWeekStart] = useState(() => getWeekStartDate(new Date()))
   const [viewMode, setViewMode] = useState<'weekly' | 'monthly'>('weekly')
   const [showComparison, setShowComparison] = useState(true)
   const [revenueDialogOpen, setRevenueDialogOpen] = useState(false)
