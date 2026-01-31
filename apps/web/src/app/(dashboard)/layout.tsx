@@ -167,8 +167,18 @@ export default function DashboardLayout({
       {/* Header */}
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-          {/* Right side - Logo and menu */}
+          {/* Right side - Menu button and Logo */}
           <div className="flex items-center gap-2 sm:gap-4">
+            {/* Mobile menu button - Left side in RTL */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden h-10 w-10"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu className="h-6 w-6" />
+            </Button>
+            
             <Link href="/dashboard" className="flex items-center gap-2">
               <div className="p-1.5 sm:p-2 bg-primary rounded-lg">
                 <Logo size="sm" className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
@@ -187,16 +197,6 @@ export default function DashboardLayout({
               <Link href="/dashboard/notifications">
                 <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
               </Link>
-            </Button>
-
-            {/* Mobile menu button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden h-10 w-10"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu className="h-6 w-6" />
             </Button>
 
             {/* User Menu - Desktop */}
