@@ -95,22 +95,41 @@ export default function ManageSchedulePage() {
 
   // Find or create schedule for current week
   const currentSchedule = schedules?.find((s) => {
-    // Use UTC date comparison to avoid timezone issues
-    const scheduleDate = new Date(s.weekStartDate)
-    const targetDate = new Date(targetWeekStart)
+    // Compare dates as strings to avoid timezone issues
+    const scheduleDateStr = new Date(s.weekStartDate).toISOString().split('T')[0]
+    const targetDateStr = targetWeekStart.toISOString().split('T')[0]
     
-    // Normalize both dates to midnight UTC for comparison
-    scheduleDate.setUTCHours(0, 0, 0, 0)
-    targetDate.setUTCHours(0, 0, 0, 0)
+    console.log('🔍 Schedule comparison:', {
+      scheduleDate: scheduleDateStr,
+      targetDate: targetDateStr,
+      match: scheduleDateStr === targetDateStr
+    })
     
-    return scheduleDate.getTime() === targetDate.getTime()
+    return scheduleDateStr === targetDateStr
   })
+  
+  console.log('📋 Found schedule:', currentSchedule?.id, 'Total schedules:', schedules?.length)
 
   // Fetch schedule details
-  const { data: scheduleDetails, isLoading: detailsLoading } = useQuery({
+  const { data: scheduleDetails, isLoading: detailsLoading, error: detailsError } = useQuery({
     queryKey: ['schedule', currentSchedule?.id],
-    queryFn: () => api.get<any>(`/schedules/${currentSchedule.id}`, accessToken!),
+    queryFn: async () => {
+      console.log('📥 Fetching schedule details for:', currentSchedule.id)
+      const result = await api.get<any>(`/schedules/${currentSchedule.id}`, accessToken!)
+      console.log('✅ Schedule details received:', {
+        id: result.id,
+        assignmentsCount: result.shiftAssignments?.length || 0
+      })
+      return result
+    },
     enabled: !!currentSchedule?.id && !!accessToken,
+  })
+  
+  console.log('📊 Schedule details:', {
+    loading: detailsLoading,
+    hasData: !!scheduleDetails,
+    error: detailsError,
+    assignmentsCount: scheduleDetails?.shiftAssignments?.length
   })
 
   // Create schedule mutation
