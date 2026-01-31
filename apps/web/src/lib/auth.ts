@@ -93,39 +93,6 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      // Always use localStorage for persistence
-      storage: {
-        getItem: (name) => {
-          try {
-            // Always read from localStorage
-            return localStorage.getItem(name)
-          } catch (error) {
-            console.error('Failed to get auth from storage:', error)
-            return null
-          }
-        },
-        setItem: (name, value) => {
-          try {
-            // Always save to localStorage
-            localStorage.setItem(name, value)
-          } catch (error) {
-            console.error('Failed to save auth to storage:', error)
-          }
-        },
-        removeItem: (name) => {
-          try {
-            localStorage.removeItem(name)
-            sessionStorage.removeItem(name)
-            // Clear cookies
-            if (typeof document !== 'undefined') {
-              document.cookie = 'refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
-              document.cookie = 'rememberMe=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
-            }
-          } catch (error) {
-            console.error('Failed to remove auth from storage:', error)
-          }
-        },
-      },
       onRehydrateStorage: () => (state) => {
         console.log('🔄 Hydrating auth state:', {
           hasState: !!state,
@@ -135,13 +102,12 @@ export const useAuthStore = create<AuthState>()(
         })
         
         if (state) {
-          state.setHasHydrated(true)
-          
           // If we have tokens but not authenticated, fix the state
           if (state.refreshToken && !state.isAuthenticated) {
             console.log('⚠️ Fixing broken auth state - has tokens but not authenticated')
             state.isAuthenticated = true
           }
+          state.setHasHydrated(true)
         } else {
           console.error('❌ No state after hydration!')
         }
