@@ -1,10 +1,13 @@
 'use client'
 
 import { useAuthStore, isManager } from '@/lib/auth'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { startOfWeek, addWeeks } from 'date-fns'
 import {
   Calendar,
   Clock,
@@ -18,8 +21,47 @@ import {
 import { PageTransition, StaggerContainer, StaggerItem, motion } from '@/components/ui/animations'
 
 export default function DashboardPage() {
-  const { user } = useAuthStore()
+  const { user, accessToken } = useAuthStore()
   const isManagerRole = isManager()
+  
+  // Get current week start date
+  const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 })
+  const nextWeekStart = addWeeks(currentWeekStart, 1)
+
+  // Fetch user's shifts for this week
+  const { data: mySchedule } = useQuery({
+    queryKey: ['my-schedule', currentWeekStart.toISOString()],
+    queryFn: () => api.get(`/schedules/my-week/${currentWeekStart.toISOString()}`, accessToken!),
+    enabled: !!accessToken && !!user,
+  })
+
+  // Fetch user's availability status for next week
+  const { data: myAvailability } = useQuery({
+    queryKey: ['my-availability', nextWeekStart.toISOString()],
+    queryFn: () => api.get(`/availability/week/${nextWeekStart.toISOString()}`, accessToken!),
+    enabled: !!accessToken && !!user,
+  })
+
+  // Fetch employees (for managers)
+  const { data: employees } = useQuery({
+    queryKey: ['employees'],
+    queryFn: () => api.get<any[]>('/users/employees', accessToken!),
+    enabled: !!accessToken && isManagerRole,
+  })
+
+  // Fetch all availability submissions for next week (for managers)
+  const { data: allAvailability } = useQuery({
+    queryKey: ['all-availability', nextWeekStart.toISOString()],
+    queryFn: () => api.get<any[]>(`/availability/week/${nextWeekStart.toISOString()}/all`, accessToken!),
+    enabled: !!accessToken && isManagerRole,
+  })
+
+  // Calculate stats
+  const myShiftsCount = mySchedule?.shiftAssignments?.length || 0
+  const activeEmployeesCount = employees?.filter((e: any) => e.isActive && e.isApproved).length || 0
+  const totalEmployees = employees?.filter((e: any) => e.isApproved).length || 0
+  const pendingAvailability = allAvailability?.filter((a: any) => a.status === 'PENDING' || !a.submittedAt).length || 0
+  const availabilityStatus = myAvailability?.status || 'NOT_SUBMITTED'
 
   const getGreeting = () => {
     const hour = new Date().getHours()
@@ -58,7 +100,7 @@ export default function DashboardPage() {
                 <Calendar className="h-4 w-4 text-blue-500 flex-shrink-0" />
               </CardHeader>
               <CardContent className="p-3 sm:p-4 pt-0">
-                <div className="text-xl sm:text-2xl font-bold text-blue-600">0</div>
+                <div className="text-xl sm:text-2xl font-bold text-blue-600">{myShiftsCount}</div>
                 <p className="text-[10px] sm:text-xs text-muted-foreground">
                   משמרות מתוכננות
                 </p>
@@ -73,11 +115,28 @@ export default function DashboardPage() {
                 <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
               </CardHeader>
               <CardContent className="p-3 sm:p-4 pt-0">
-                <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] sm:text-xs">
-                  טרם הוגש
-                </Badge>
+                {availabilityStatus === 'APPROVED' ? (
+                  <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[10px] sm:text-xs">
+                    אושר
+                  </Badge>
+                ) : availabilityStatus === 'PENDING' ? (
+                  <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] sm:text-xs">
+                    ממתין לאישור
+                  </Badge>
+                ) : availabilityStatus === 'REJECTED' ? (
+                  <Badge variant="destructive" className="text-[10px] sm:text-xs">
+                    נדחה
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] sm:text-xs">
+                    טרם הוגש
+                  </Badge>
+                )}
                 <p className="text-[10px] sm:text-xs text-muted-foreground mt-1.5">
-                  יש להגיש זמינות לשבוע הבא
+                  {availabilityStatus === 'APPROVED' ? 'הזמינות לשבוע הבא אושרה' : 
+                   availabilityStatus === 'PENDING' ? 'הזמינות שלך ממתינה לאישור' :
+                   availabilityStatus === 'REJECTED' ? 'יש לעדכן את הזמינות' :
+                   'יש להגיש זמינות לשבוע הבא'}
                 </p>
               </CardContent>
             </Card>
@@ -92,9 +151,9 @@ export default function DashboardPage() {
                     <Users className="h-4 w-4 text-green-500 flex-shrink-0" />
                   </CardHeader>
                   <CardContent className="p-3 sm:p-4 pt-0">
-                    <div className="text-xl sm:text-2xl font-bold text-green-600">0</div>
+                    <div className="text-xl sm:text-2xl font-bold text-green-600">{activeEmployeesCount}</div>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">
-                      עובדים רשומים במערכת
+                      מתוך {totalEmployees} עובדים במערכת
                     </p>
                   </CardContent>
                 </Card>
@@ -107,9 +166,9 @@ export default function DashboardPage() {
                     <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0" />
                   </CardHeader>
                   <CardContent className="p-3 sm:p-4 pt-0">
-                    <div className="text-xl sm:text-2xl font-bold text-orange-600">0</div>
+                    <div className="text-xl sm:text-2xl font-bold text-orange-600">{pendingAvailability}</div>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">
-                      טרם הוגשו זמינויות
+                      זמינויות ממתינות לאישור
                     </p>
                   </CardContent>
                 </Card>

@@ -8,7 +8,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL") // For Neon connection pooling
+  directUrl = env("DIRECT_URL") // For Neon connection pooling - optional for local dev
 }
 
 enum Role {
@@ -112,6 +112,8 @@ model User {
   organizationId String         @map("organization_id")
   jobCategoryId  String?        @map("job_category_id")
   hourlyWage     Float          @default(0) @map("hourly_wage")
+  baseHourlyWage Float?         @map("base_hourly_wage") // For tip-based employees (waiters)
+  isTipBased     Boolean        @default(false) @map("is_tip_based") // Whether salary is tip-based
   isActive       Boolean        @default(true) @map("is_active")
   isApproved     Boolean        @default(false) @map("is_approved")
   createdAt      DateTime       @default(now()) @map("created_at")
@@ -204,6 +206,7 @@ model ShiftAssignment {
   shiftTemplateId String           @map("shift_template_id")
   shiftDate       DateTime         @map("shift_date") @db.Date
   status          AssignmentStatus @default(PENDING)
+  tipsEarned      Float?           @default(0) @map("tips_earned") // Tips earned during this shift
   createdAt       DateTime         @default(now()) @map("created_at")
 
   schedule      WeeklySchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
@@ -231,6 +234,21 @@ model Notification {
   @@index([userId])
   @@index([createdAt])
   @@map("notifications")
+}
+
+model DailyRevenue {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  date           DateTime @db.Date
+  totalRevenue   Float    @map("total_revenue")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, date])
+  @@index([organizationId])
+  @@index([date])
+  @@map("daily_revenues")
 }
 
 model RefreshToken {

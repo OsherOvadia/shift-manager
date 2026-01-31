@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { ReportsController } from './reports.controller';
+import { DailyRevenuesModule } from '../daily-revenues/daily-revenues.module';
 
 @Module({
+  imports: [DailyRevenuesModule],
   controllers: [ReportsController],
   providers: [ReportsService],
   exports: [ReportsService],

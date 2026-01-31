@@ -1,12 +1,25 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, startOfWeek, addWeeks, subWeeks } from 'date-fns'
 import { he } from 'date-fns/locale'
 import { api } from '@/lib/api'
+import { useAuthStore } from '@/lib/auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { useToast } from '@/components/ui/use-toast'
 import {
   ChevronRight,
   ChevronLeft,
@@ -15,6 +28,9 @@ import {
   Users,
   Calendar,
   TrendingUp,
+  Edit,
+  Coins,
+  PieChart,
 } from 'lucide-react'
 import { 
   PageTransition, 
@@ -27,11 +43,61 @@ import {
 
 export default function ReportsPage() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }))
+  const [revenueDialogOpen, setRevenueDialogOpen] = useState(false)
+  const [tipsDialogOpen, setTipsDialogOpen] = useState(false)
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null)
+  const [revenueAmount, setRevenueAmount] = useState('')
+  const [tipsAmount, setTipsAmount] = useState<{ [key: string]: string }>({})
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const { accessToken } = useAuthStore()
 
-  const { data: report, isLoading, isFetching } = useQuery({
+  const { data: report, isLoading, isFetching, error } = useQuery({
     queryKey: ['weekly-costs', weekStart.toISOString()],
-    queryFn: () => api.get(`/reports/weekly-costs?date=${weekStart.toISOString()}`),
+    queryFn: () => api.get(`/reports/weekly-costs?date=${weekStart.toISOString()}`, accessToken!),
+    enabled: !!accessToken,
     staleTime: 1000 * 60 * 5,
+  })
+
+  const saveDailyRevenueMutation = useMutation({
+    mutationFn: (data: { date: string; totalRevenue: number }) =>
+      api.post('/daily-revenues', data),
+    onSuccess: () => {
+      toast({
+        title: 'הצלחה',
+        description: 'הכנסה יומית נשמרה בהצלחה',
+      })
+      queryClient.invalidateQueries({ queryKey: ['weekly-costs'] })
+      setRevenueDialogOpen(false)
+      setRevenueAmount('')
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'שגיאה',
+        description: error.message || 'שגיאה בשמירת הכנסה יומית',
+        variant: 'destructive',
+      })
+    },
+  })
+
+  const updateTipsMutation = useMutation({
+    mutationFn: ({ assignmentId, tips }: { assignmentId: string; tips: number }) =>
+      api.patch(`/assignments/${assignmentId}`, { tipsEarned: tips }),
+    onSuccess: () => {
+      toast({
+        title: 'הצלחה',
+        description: 'טיפים עודכנו בהצלחה',
+      })
+      queryClient.invalidateQueries({ queryKey: ['weekly-costs'] })
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'שגיאה',
+        description: error.message || 'שגיאה בעדכון טיפים',
+        variant: 'destructive',
+      })
+    },
   })
 
   const previousWeek = () => setWeekStart(subWeeks(weekStart, 1))
@@ -42,6 +108,66 @@ export default function ReportsPage() {
       style: 'currency',
       currency: 'ILS',
     }).format(amount)
+  }
+
+  const handleSaveDailyRevenue = () => {
+    if (!selectedDate || !revenueAmount) {
+      toast({
+        title: 'שגיאה',
+        description: 'אנא מלא את כל השדות',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    saveDailyRevenueMutation.mutate({
+      date: selectedDate.toISOString(),
+      totalRevenue: parseFloat(revenueAmount),
+    })
+  }
+
+  const openRevenueDialog = (date: Date) => {
+    setSelectedDate(date)
+    // Find existing revenue for this date
+    const dayData = report?.byDay?.find(
+      (d: any) => new Date(d.date).toDateString() === date.toDateString()
+    )
+    setRevenueAmount(dayData?.revenue ? dayData.revenue.toString() : '')
+    setRevenueDialogOpen(true)
+  }
+
+  const openTipsDialog = (employee: any) => {
+    setSelectedEmployee(employee)
+    // Initialize tips amounts from employee shifts
+    const initialTips: { [key: string]: string } = {}
+    employee.shifts?.forEach((shift: any) => {
+      initialTips[shift.date] = shift.tips?.toString() || '0'
+    })
+    setTipsAmount(initialTips)
+    setTipsDialogOpen(true)
+  }
+
+  const handleSaveTips = async () => {
+    if (!selectedEmployee) return
+
+    try {
+      // Update tips for each shift
+      const promises = selectedEmployee.shifts.map((shift: any) => {
+        const tips = parseFloat(tipsAmount[shift.date] || '0')
+        // You'll need to pass the assignment ID through the shift data
+        // For now, we'll need to fetch assignments separately or include IDs in report
+        return updateTipsMutation.mutateAsync({
+          assignmentId: shift.assignmentId, // This needs to be included in the report
+          tips,
+        })
+      })
+
+      await Promise.all(promises)
+      setTipsDialogOpen(false)
+      setSelectedEmployee(null)
+    } catch (error) {
+      // Error handled by mutation
+    }
   }
 
   return (
@@ -112,21 +238,28 @@ export default function ReportsPage() {
               </Card>
             ))}
           </div>
+        ) : error ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-red-500 font-medium mb-2">שגיאה בטעינת הנתונים</p>
+              <p className="text-sm text-muted-foreground">{(error as any)?.message || 'נסה לרענן את הדף'}</p>
+            </CardContent>
+          </Card>
         ) : report ? (
           <div className="space-y-4">
             {/* Summary Cards */}
-            <StaggerContainer className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StaggerContainer className="grid grid-cols-2 lg:grid-cols-6 gap-3">
               <StaggerItem>
                 <Card>
                   <CardHeader className="p-3 pb-1">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-xs sm:text-sm font-medium">סה״כ עלות</CardTitle>
-                      <DollarSign className="h-4 w-4 text-green-500" />
+                      <CardTitle className="text-xs sm:text-sm font-medium">סה״כ הכנסות</CardTitle>
+                      <TrendingUp className="h-4 w-4 text-emerald-500" />
                     </div>
                   </CardHeader>
                   <CardContent className="p-3 pt-0">
-                    <div className="text-lg sm:text-xl font-bold text-green-600">
-                      {formatCurrency(report.summary.totalCost)}
+                    <div className="text-lg sm:text-xl font-bold text-emerald-600">
+                      {formatCurrency(report.summary.totalRevenue || 0)}
                     </div>
                   </CardContent>
                 </Card>
@@ -136,7 +269,60 @@ export default function ReportsPage() {
                 <Card>
                   <CardHeader className="p-3 pb-1">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-xs sm:text-sm font-medium">שעות עבודה</CardTitle>
+                      <CardTitle className="text-xs sm:text-sm font-medium">עלות שכר</CardTitle>
+                      <DollarSign className="h-4 w-4 text-red-500" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0">
+                    <div className="text-lg sm:text-xl font-bold text-red-600">
+                      {formatCurrency(report.summary.totalCost)}
+                    </div>
+                    {report.summary.totalRevenue > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        {report.summary.salaryPercentage.toFixed(1)}% מההכנסות
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </StaggerItem>
+
+              <StaggerItem>
+                <Card>
+                  <CardHeader className="p-3 pb-1">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-xs sm:text-sm font-medium">טיפים</CardTitle>
+                      <Coins className="h-4 w-4 text-amber-500" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0">
+                    <div className="text-lg sm:text-xl font-bold text-amber-600">
+                      {formatCurrency(report.summary.totalTips || 0)}
+                    </div>
+                  </CardContent>
+                </Card>
+              </StaggerItem>
+
+              <StaggerItem>
+                <Card>
+                  <CardHeader className="p-3 pb-1">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-xs sm:text-sm font-medium">רווח</CardTitle>
+                      <PieChart className="h-4 w-4 text-green-500" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0">
+                    <div className="text-lg sm:text-xl font-bold text-green-600">
+                      {report.summary.profitMargin.toFixed(1)}%
+                    </div>
+                  </CardContent>
+                </Card>
+              </StaggerItem>
+
+              <StaggerItem>
+                <Card>
+                  <CardHeader className="p-3 pb-1">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-xs sm:text-sm font-medium">שעות</CardTitle>
                       <Clock className="h-4 w-4 text-blue-500" />
                     </div>
                   </CardHeader>
@@ -159,22 +345,6 @@ export default function ReportsPage() {
                   <CardContent className="p-3 pt-0">
                     <div className="text-lg sm:text-xl font-bold text-purple-600">
                       {report.summary.employeeCount}
-                    </div>
-                  </CardContent>
-                </Card>
-              </StaggerItem>
-
-              <StaggerItem>
-                <Card>
-                  <CardHeader className="p-3 pb-1">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-xs sm:text-sm font-medium">משמרות</CardTitle>
-                      <Calendar className="h-4 w-4 text-orange-500" />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-3 pt-0">
-                    <div className="text-lg sm:text-xl font-bold text-orange-600">
-                      {report.summary.shiftCount}
                     </div>
                   </CardContent>
                 </Card>
@@ -228,25 +398,69 @@ export default function ReportsPage() {
                     {report.byEmployee.map((emp: any) => (
                       <div 
                         key={emp.user.id} 
-                        className="flex items-center justify-between p-2.5 bg-muted rounded-lg"
+                        className="p-2.5 bg-muted rounded-lg"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          {emp.user.jobCategory && (
-                            <div
-                              className="w-1.5 h-6 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: emp.user.jobCategory.color }}
-                            />
-                          )}
-                          <div className="min-w-0">
-                            <div className="font-medium text-sm truncate">
-                              {emp.user.firstName} {emp.user.lastName}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            {emp.user.jobCategory && (
+                              <div
+                                className="w-1.5 h-6 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: emp.user.jobCategory.color }}
+                              />
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-sm truncate">
+                                {emp.user.firstName} {emp.user.lastName}
+                                {emp.user.isTipBased && (
+                                  <span className="mr-1 text-xs text-amber-600">(טיפים)</span>
+                                )}
+                              </div>
+                              <div className="text-[10px] sm:text-xs text-muted-foreground">
+                                {emp.user.jobCategory?.nameHe || 'ללא'} • {emp.totalHours.toFixed(1)} שעות
+                              </div>
                             </div>
-                            <div className="text-[10px] sm:text-xs text-muted-foreground">
-                              {emp.user.jobCategory?.nameHe || 'ללא'} • {emp.totalHours.toFixed(1)} שעות
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {emp.user.isTipBased && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => openTipsDialog(emp)}
+                              >
+                                <Coins className="h-3 w-3" />
+                              </Button>
+                            )}
+                            <div className="text-left flex-shrink-0">
+                              <div className="font-bold text-sm">{formatCurrency(emp.totalCost)}</div>
+                              {emp.user.isTipBased && emp.totalTips > 0 && (
+                                <div className="text-[10px] text-amber-600">
+                                  טיפים: {formatCurrency(emp.totalTips)}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
-                        <div className="font-bold text-sm flex-shrink-0">{formatCurrency(emp.totalCost)}</div>
+                        {emp.user.isTipBased && (
+                          <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
+                            <div className="flex justify-between">
+                              <span>שכר בסיס:</span>
+                              <span>{emp.user.baseHourlyWage?.toFixed(0)} ₪/שעה</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>טיפים לשעה:</span>
+                              <span className="text-amber-600">
+                                {emp.totalHours > 0 ? (emp.totalTips / emp.totalHours).toFixed(0) : 0} ₪/שעה
+                              </span>
+                            </div>
+                            <div className="flex justify-between font-medium">
+                              <span>תשלום מנהל:</span>
+                              <span className={emp.tipsCoverSalary ? 'text-green-600' : 'text-orange-600'}>
+                                {emp.tipsCoverSalary ? '₪0 (טיפים מכסים)' : formatCurrency(emp.managerPayment)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -262,21 +476,50 @@ export default function ReportsPage() {
                 <CardTitle className="text-sm sm:text-base">פירוט יומי</CardTitle>
               </CardHeader>
               <CardContent className="p-3 sm:p-4 pt-0">
-                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 sm:gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-7 gap-2">
                   {report.byDay.map((day: any, index: number) => (
                     <motion.div 
                       key={index} 
-                      className="p-2 bg-muted rounded-lg text-center"
-                      whileHover={{ scale: 1.05 }}
+                      className="p-2 bg-muted rounded-lg"
+                      whileHover={{ scale: 1.02 }}
                     >
-                      <div className="text-[10px] text-muted-foreground truncate">
-                        {format(new Date(day.date), 'EEE', { locale: he })}
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="text-xs font-medium">
+                          {format(new Date(day.date), 'EEE dd/MM', { locale: he })}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          onClick={() => openRevenueDialog(new Date(day.date))}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
                       </div>
-                      <div className="font-bold text-xs sm:text-sm mt-0.5">
-                        {formatCurrency(day.totalCost).replace('₪', '')}
-                      </div>
-                      <div className="text-[9px] sm:text-[10px] text-muted-foreground">
-                        {day.totalHours.toFixed(0)}ש׳
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">הכנסה:</span>
+                          <span className="font-medium text-emerald-600">
+                            {day.revenue ? formatCurrency(day.revenue).replace('₪', '') : '-'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">שכר:</span>
+                          <span className="font-medium text-red-600">
+                            {formatCurrency(day.totalCost).replace('₪', '')}
+                          </span>
+                        </div>
+                        {day.revenue > 0 && (
+                          <div className="flex justify-between text-[10px]">
+                            <span className="text-muted-foreground">אחוז שכר:</span>
+                            <span className={day.salaryPercentage > 50 ? 'text-red-600' : 'text-green-600'}>
+                              {day.salaryPercentage.toFixed(1)}%
+                            </span>
+                          </div>
+                        )}
+                        <div className="text-[10px] text-muted-foreground text-center pt-1 border-t">
+                          {day.totalHours.toFixed(0)} שעות • {day.employeeCount} עובדים
+                        </div>
                       </div>
                     </motion.div>
                   ))}
@@ -291,6 +534,101 @@ export default function ReportsPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Daily Revenue Dialog */}
+        <Dialog open={revenueDialogOpen} onOpenChange={setRevenueDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>עדכון הכנסה יומית</DialogTitle>
+              <DialogDescription>
+                {selectedDate && `תאריך: ${format(selectedDate, 'dd/MM/yyyy', { locale: he })}`}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="revenue">סכום הכנסה (₪)</Label>
+                <Input
+                  id="revenue"
+                  type="number"
+                  placeholder="0.00"
+                  value={revenueAmount}
+                  onChange={(e) => setRevenueAmount(e.target.value)}
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setRevenueDialogOpen(false)}
+              >
+                ביטול
+              </Button>
+              <Button
+                onClick={handleSaveDailyRevenue}
+                disabled={saveDailyRevenueMutation.isPending}
+              >
+                {saveDailyRevenueMutation.isPending ? 'שומר...' : 'שמור'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Tips Entry Dialog */}
+        <Dialog open={tipsDialogOpen} onOpenChange={setTipsDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>עדכון טיפים</DialogTitle>
+              <DialogDescription>
+                {selectedEmployee && `${selectedEmployee.user.firstName} ${selectedEmployee.user.lastName}`}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-4 max-h-[400px] overflow-y-auto">
+              {selectedEmployee?.shifts?.map((shift: any, index: number) => (
+                <div key={index} className="space-y-2 p-3 bg-muted rounded-lg">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="font-medium">
+                      {format(new Date(shift.date), 'EEE dd/MM', { locale: he })}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {shift.shiftTemplate.name} • {shift.hours.toFixed(1)}ש׳
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor={`tips-${index}`} className="text-xs">טיפים (₪)</Label>
+                    <Input
+                      id={`tips-${index}`}
+                      type="number"
+                      placeholder="0.00"
+                      value={tipsAmount[shift.date] || '0'}
+                      onChange={(e) => setTipsAmount(prev => ({
+                        ...prev,
+                        [shift.date]: e.target.value
+                      }))}
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setTipsDialogOpen(false)}
+              >
+                ביטול
+              </Button>
+              <Button
+                onClick={handleSaveTips}
+                disabled={updateTipsMutation.isPending}
+              >
+                {updateTipsMutation.isPending ? 'שומר...' : 'שמור הכל'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </PageTransition>
   )
