@@ -47,10 +47,11 @@ const SHIFT_TYPES: Record<string, { label: string; color: string }> = {
 export default function RevenuePage() {
   const [weekStart, setWeekStart] = useState(() => getWeekStartDate(new Date()))
   const [selectedDay, setSelectedDay] = useState<number>(0)
-  const [sittingTips, setSittingTips] = useState<{ [assignmentId: string]: string }>({})
-  const [takeawayTips, setTakeawayTips] = useState<{ [assignmentId: string]: string }>({})
-  const [deliveryTips, setDeliveryTips] = useState<{ [assignmentId: string]: string }>({})
-  const [savingTips, setSavingTips] = useState<string | null>(null)
+  const [sittingRevenue, setSittingRevenue] = useState<{ [assignmentId: string]: string }>({})
+  const [takeawayRevenue, setTakeawayRevenue] = useState<{ [assignmentId: string]: string }>({})
+  const [deliveryRevenue, setDeliveryRevenue] = useState<{ [assignmentId: string]: string }>({})
+  const [tips, setTips] = useState<{ [assignmentId: string]: string }>({})
+  const [savingData, setSavingData] = useState<string | null>(null)
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const { accessToken } = useAuthStore()
@@ -93,55 +94,58 @@ export default function RevenuePage() {
     return formatDateLocal(date)
   }
 
-  // Initialize tips from schedule data
+  // Initialize shift data from schedule
   useEffect(() => {
     if (scheduleData?.shiftAssignments) {
       const newSitting: { [key: string]: string } = {}
       const newTakeaway: { [key: string]: string } = {}
       const newDelivery: { [key: string]: string } = {}
+      const newTips: { [key: string]: string } = {}
       
       scheduleData.shiftAssignments.forEach((a: any) => {
         if (a.sittingTips) newSitting[a.id] = a.sittingTips.toString()
         if (a.takeawayTips) newTakeaway[a.id] = a.takeawayTips.toString()
         if (a.deliveryTips) newDelivery[a.id] = a.deliveryTips.toString()
+        if (a.tipsEarned) newTips[a.id] = a.tipsEarned.toString()
       })
       
-      setSittingTips(prev => ({ ...newSitting, ...prev }))
-      setTakeawayTips(prev => ({ ...newTakeaway, ...prev }))
-      setDeliveryTips(prev => ({ ...newDelivery, ...prev }))
+      setSittingRevenue(prev => ({ ...newSitting, ...prev }))
+      setTakeawayRevenue(prev => ({ ...newTakeaway, ...prev }))
+      setDeliveryRevenue(prev => ({ ...newDelivery, ...prev }))
+      setTips(prev => ({ ...newTips, ...prev }))
     }
   }, [scheduleData])
 
-  const updateTipsMutation = useMutation({
-    mutationFn: ({ assignmentId, sitting, takeaway, delivery, total }: { 
+  const updateShiftDataMutation = useMutation({
+    mutationFn: ({ assignmentId, sitting, takeaway, delivery, tips }: { 
       assignmentId: string; 
       sitting: number; 
       takeaway: number; 
-      delivery: number; 
-      total: number 
+      delivery: number;
+      tips: number;
     }) =>
       api.patch(`/assignments/${assignmentId}`, { 
         sittingTips: sitting,
         takeawayTips: takeaway,
         deliveryTips: delivery,
-        tipsEarned: total 
+        tipsEarned: tips 
       }, accessToken!),
     onSuccess: () => {
       toast({
-        title: 'נשמר',
-        description: 'טיפים נשמרו בהצלחה',
+        title: 'נשמר בהצלחה',
+        description: 'נתוני המשמרת נשמרו',
       })
       queryClient.invalidateQueries({ queryKey: ['schedule-week'] })
       queryClient.invalidateQueries({ queryKey: ['weekly-costs'] })
-      setSavingTips(null)
+      setSavingData(null)
     },
     onError: (error: any) => {
       toast({
         title: 'שגיאה',
-        description: error.message || 'לא ניתן לשמור טיפים',
+        description: error.message || 'לא ניתן לשמור את הנתונים',
         variant: 'destructive',
       })
-      setSavingTips(null)
+      setSavingData(null)
     },
   })
 
@@ -156,14 +160,14 @@ export default function RevenuePage() {
     }).format(amount)
   }
 
-  const handleSaveTips = (assignmentId: string) => {
-    const sitting = parseFloat(sittingTips[assignmentId] || '0')
-    const takeaway = parseFloat(takeawayTips[assignmentId] || '0')
-    const delivery = parseFloat(deliveryTips[assignmentId] || '0')
-    const total = sitting + takeaway + delivery
+  const handleSaveShiftData = (assignmentId: string) => {
+    const sitting = parseFloat(sittingRevenue[assignmentId] || '0')
+    const takeaway = parseFloat(takeawayRevenue[assignmentId] || '0')
+    const delivery = parseFloat(deliveryRevenue[assignmentId] || '0')
+    const tipsValue = parseFloat(tips[assignmentId] || '0')
     
-    if (isNaN(sitting) || isNaN(takeaway) || isNaN(delivery) || 
-        sitting < 0 || takeaway < 0 || delivery < 0) {
+    if (isNaN(sitting) || isNaN(takeaway) || isNaN(delivery) || isNaN(tipsValue) ||
+        sitting < 0 || takeaway < 0 || delivery < 0 || tipsValue < 0) {
       toast({
         title: 'שגיאה',
         description: 'אנא הזן סכומים תקינים',
@@ -172,13 +176,13 @@ export default function RevenuePage() {
       return
     }
 
-    setSavingTips(assignmentId)
-    updateTipsMutation.mutate({
+    setSavingData(assignmentId)
+    updateShiftDataMutation.mutate({
       assignmentId,
       sitting,
       takeaway,
       delivery,
-      total,
+      tips: tipsValue,
     })
   }
 
@@ -205,20 +209,26 @@ export default function RevenuePage() {
     let totalSitting = 0
     let totalTakeaway = 0
     let totalDelivery = 0
+    let totalRevenue = 0
     let totalTips = 0
     let totalShifts = 0
 
     if (scheduleData?.shiftAssignments) {
       scheduleData.shiftAssignments.forEach((a: any) => {
-        totalSitting += a.sittingTips || 0
-        totalTakeaway += a.takeawayTips || 0
-        totalDelivery += a.deliveryTips || 0
+        const sitting = a.sittingTips || 0
+        const takeaway = a.takeawayTips || 0
+        const delivery = a.deliveryTips || 0
+        
+        totalSitting += sitting
+        totalTakeaway += takeaway
+        totalDelivery += delivery
+        totalRevenue += sitting + takeaway + delivery
         totalTips += a.tipsEarned || 0
       })
       totalShifts = scheduleData.shiftAssignments.filter((a: any) => a.status !== 'CANCELLED').length
     }
 
-    return { totalSitting, totalTakeaway, totalDelivery, totalTips, totalShifts }
+    return { totalSitting, totalTakeaway, totalDelivery, totalRevenue, totalTips, totalShifts }
   }, [scheduleData])
 
   const shiftsForSelectedDay = getShiftsForDate(selectedDate)
@@ -429,21 +439,21 @@ export default function RevenuePage() {
                                   </div>
                                 </div>
 
-                                {/* Tips Input - only for tip-based employees */}
+                                {/* Shift Revenue & Tips - only for tip-based employees */}
                                 {isTipBased ? (
                                   <div className="flex-1">
-                                    <div className="grid grid-cols-4 gap-2 items-end">
-                                      {/* Sitting Tips */}
+                                    <div className="grid grid-cols-5 gap-2 items-end">
+                                      {/* Sitting Revenue */}
                                       <div className="space-y-1">
-                                        <Label className="text-[10px] font-medium flex items-center gap-0.5">
+                                        <Label className="text-[10px] font-medium flex items-center gap-0.5 text-blue-600">
                                           <Utensils className="h-2.5 w-2.5" />
-                                          ישיבה
+                                          ישיבה ₪
                                         </Label>
                                         <Input
                                           type="number"
                                           placeholder="0"
-                                          value={sittingTips[assignment.id] || ''}
-                                          onChange={(e) => setSittingTips(prev => ({
+                                          value={sittingRevenue[assignment.id] || ''}
+                                          onChange={(e) => setSittingRevenue(prev => ({
                                             ...prev,
                                             [assignment.id]: e.target.value
                                           }))}
@@ -452,17 +462,17 @@ export default function RevenuePage() {
                                         />
                                       </div>
                                       
-                                      {/* Takeaway Tips */}
+                                      {/* Takeaway Revenue */}
                                       <div className="space-y-1">
-                                        <Label className="text-[10px] font-medium flex items-center gap-0.5">
+                                        <Label className="text-[10px] font-medium flex items-center gap-0.5 text-purple-600">
                                           <Receipt className="h-2.5 w-2.5" />
-                                          TA
+                                          TA ₪
                                         </Label>
                                         <Input
                                           type="number"
                                           placeholder="0"
-                                          value={takeawayTips[assignment.id] || ''}
-                                          onChange={(e) => setTakeawayTips(prev => ({
+                                          value={takeawayRevenue[assignment.id] || ''}
+                                          onChange={(e) => setTakeawayRevenue(prev => ({
                                             ...prev,
                                             [assignment.id]: e.target.value
                                           }))}
@@ -471,17 +481,17 @@ export default function RevenuePage() {
                                         />
                                       </div>
                                       
-                                      {/* Delivery Tips */}
+                                      {/* Delivery Revenue */}
                                       <div className="space-y-1">
-                                        <Label className="text-[10px] font-medium flex items-center gap-0.5">
+                                        <Label className="text-[10px] font-medium flex items-center gap-0.5 text-orange-600">
                                           <Clock className="h-2.5 w-2.5" />
-                                          משלוחים
+                                          משלוחים ₪
                                         </Label>
                                         <Input
                                           type="number"
                                           placeholder="0"
-                                          value={deliveryTips[assignment.id] || ''}
-                                          onChange={(e) => setDeliveryTips(prev => ({
+                                          value={deliveryRevenue[assignment.id] || ''}
+                                          onChange={(e) => setDeliveryRevenue(prev => ({
                                             ...prev,
                                             [assignment.id]: e.target.value
                                           }))}
@@ -490,22 +500,42 @@ export default function RevenuePage() {
                                         />
                                       </div>
                                       
-                                      {/* Total and Save Button */}
+                                      {/* Tips (separate) */}
                                       <div className="space-y-1">
-                                        <Label className="text-[10px] font-medium text-amber-600">
+                                        <Label className="text-[10px] font-medium flex items-center gap-0.5 text-amber-600">
+                                          <Coins className="h-2.5 w-2.5" />
+                                          טיפ ₪
+                                        </Label>
+                                        <Input
+                                          type="number"
+                                          placeholder="0"
+                                          value={tips[assignment.id] || ''}
+                                          onChange={(e) => setTips(prev => ({
+                                            ...prev,
+                                            [assignment.id]: e.target.value
+                                          }))}
+                                          className="h-9 text-sm"
+                                          min="0"
+                                        />
+                                      </div>
+                                      
+                                      {/* Save Button */}
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px] font-medium text-emerald-600">
                                           סה״כ: ₪{(
-                                            (parseFloat(sittingTips[assignment.id] || '0') +
-                                             parseFloat(takeawayTips[assignment.id] || '0') +
-                                             parseFloat(deliveryTips[assignment.id] || '0'))
+                                            (parseFloat(sittingRevenue[assignment.id] || '0') +
+                                             parseFloat(takeawayRevenue[assignment.id] || '0') +
+                                             parseFloat(deliveryRevenue[assignment.id] || '0') +
+                                             parseFloat(tips[assignment.id] || '0'))
                                           ).toFixed(0)}
                                         </Label>
                                         <Button 
                                           size="sm"
-                                          onClick={() => handleSaveTips(assignment.id)}
-                                          disabled={savingTips === assignment.id}
+                                          onClick={() => handleSaveShiftData(assignment.id)}
+                                          disabled={savingData === assignment.id}
                                           className="h-9 w-full"
                                         >
-                                          {savingTips === assignment.id ? (
+                                          {savingData === assignment.id ? (
                                             <motion.div 
                                               className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
                                               animate={{ rotate: 360 }}
@@ -523,7 +553,7 @@ export default function RevenuePage() {
                                   </div>
                                 ) : (
                                   <div className="text-xs text-muted-foreground px-3">
-                                    לא נדרש טיפ
+                                    לא נדרש מעקב
                                   </div>
                                 )}
                               </div>
