@@ -204,36 +204,39 @@ export default function ReportsPage() {
 
           {/* Week Navigation */}
           <motion.div 
-            className="flex items-center gap-2 bg-muted rounded-lg p-1"
+            className="flex items-center gap-2 bg-muted rounded-lg p-2"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3, delay: 0.1 }}
           >
             <ScaleOnTap>
-              <Button variant="ghost" size="icon" onClick={previousWeek} className="h-8 w-8">
-                <ChevronRight className="h-4 w-4" />
+              <Button variant="ghost" size="icon" onClick={previousWeek} className="h-10 w-10">
+                <ChevronRight className="h-5 w-5" />
               </Button>
             </ScaleOnTap>
             <AnimatePresence mode="wait">
-              <motion.span 
+              <motion.div
                 key={weekStart.toISOString()}
-                className="min-w-[120px] sm:min-w-[160px] text-center text-xs sm:text-sm font-medium"
+                className="flex items-center gap-2 min-w-[140px] sm:min-w-[180px] justify-center px-2"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                {format(weekStart, 'dd/MM', { locale: he })} - {format(addWeeks(weekStart, 1), 'dd/MM/yy', { locale: he })}
-              </motion.span>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm sm:text-base font-semibold">
+                  {format(weekStart, 'dd/MM', { locale: he })} - {format(addWeeks(weekStart, 1), 'dd/MM/yy', { locale: he })}
+                </span>
+              </motion.div>
             </AnimatePresence>
             <ScaleOnTap>
-              <Button variant="ghost" size="icon" onClick={nextWeek} className="h-8 w-8">
-                <ChevronLeft className="h-4 w-4" />
+              <Button variant="ghost" size="icon" onClick={nextWeek} className="h-10 w-10">
+                <ChevronLeft className="h-5 w-5" />
               </Button>
             </ScaleOnTap>
             {isFetching && (
               <motion.div 
-                className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full"
+                className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full"
                 animate={{ rotate: 360 }}
                 transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
               />
