@@ -96,7 +96,7 @@ export default function RevenuePage() {
     return formatDateLocal(date)
   }
 
-  // Initialize shift data from schedule
+  // Initialize shift data from schedule (using shift keys, not assignment IDs)
   useEffect(() => {
     if (scheduleData?.shiftAssignments) {
       const newSitting: { [key: string]: string } = {}
@@ -104,17 +104,30 @@ export default function RevenuePage() {
       const newDelivery: { [key: string]: string } = {}
       const newTips: { [key: string]: string } = {}
       
+      // Group by shift (date + type) and take first assignment's values
+      const shiftMap = new Map<string, any>()
+      
       scheduleData.shiftAssignments.forEach((a: any) => {
-        if (a.sittingTips) newSitting[a.id] = a.sittingTips.toString()
-        if (a.takeawayTips) newTakeaway[a.id] = a.takeawayTips.toString()
-        if (a.deliveryTips) newDelivery[a.id] = a.deliveryTips.toString()
-        if (a.tipsEarned) newTips[a.id] = a.tipsEarned.toString()
+        const dateStr = getDateStr(a.shiftDate)
+        const originalType = a.shiftTemplate.shiftType
+        // Combine EVENING and EVENING_CLOSE
+        const shiftType = (originalType === 'EVENING_CLOSE') ? 'EVENING' : originalType
+        const shiftKey = `${dateStr}_${shiftType}`
+        
+        // Only store first occurrence (all workers in shift have same values)
+        if (!shiftMap.has(shiftKey)) {
+          shiftMap.set(shiftKey, a)
+          if (a.sittingTips) newSitting[shiftKey] = a.sittingTips.toString()
+          if (a.takeawayTips) newTakeaway[shiftKey] = a.takeawayTips.toString()
+          if (a.deliveryTips) newDelivery[shiftKey] = a.deliveryTips.toString()
+          if (a.tipsEarned) newTips[shiftKey] = a.tipsEarned.toString()
+        }
       })
       
-      setSittingRevenue(prev => ({ ...newSitting, ...prev }))
-      setTakeawayRevenue(prev => ({ ...newTakeaway, ...prev }))
-      setDeliveryRevenue(prev => ({ ...newDelivery, ...prev }))
-      setTips(prev => ({ ...newTips, ...prev }))
+      setSittingRevenue(newSitting)
+      setTakeawayRevenue(newTakeaway)
+      setDeliveryRevenue(newDelivery)
+      setTips(newTips)
     }
   }, [scheduleData])
 
@@ -249,7 +262,7 @@ export default function RevenuePage() {
     return revenueData.find((r: any) => getDateStr(r.date) === dateStr)
   }
 
-  // Calculate totals for summary
+  // Calculate totals for summary (count each shift once, not per worker!)
   const weeklyTotals = useMemo(() => {
     let totalSitting = 0
     let totalTakeaway = 0
@@ -259,18 +272,31 @@ export default function RevenuePage() {
     let totalShifts = 0
 
     if (scheduleData?.shiftAssignments) {
+      // Group by shift to avoid counting same shift multiple times
+      const shiftMap = new Map<string, any>()
+      
       scheduleData.shiftAssignments.forEach((a: any) => {
-        const sitting = a.sittingTips || 0
-        const takeaway = a.takeawayTips || 0
-        const delivery = a.deliveryTips || 0
+        const dateStr = getDateStr(a.shiftDate)
+        const originalType = a.shiftTemplate.shiftType
+        const shiftType = (originalType === 'EVENING_CLOSE') ? 'EVENING' : originalType
+        const shiftKey = `${dateStr}_${shiftType}`
         
-        totalSitting += sitting
-        totalTakeaway += takeaway
-        totalDelivery += delivery
-        totalRevenue += sitting + takeaway + delivery
-        totalTips += a.tipsEarned || 0
+        // Only count each unique shift once
+        if (!shiftMap.has(shiftKey) && a.status !== 'CANCELLED') {
+          shiftMap.set(shiftKey, a)
+          
+          const sitting = a.sittingTips || 0
+          const takeaway = a.takeawayTips || 0
+          const delivery = a.deliveryTips || 0
+          
+          totalSitting += sitting
+          totalTakeaway += takeaway
+          totalDelivery += delivery
+          totalRevenue += sitting + takeaway + delivery
+          totalTips += a.tipsEarned || 0
+          totalShifts++
+        }
       })
-      totalShifts = scheduleData.shiftAssignments.filter((a: any) => a.status !== 'CANCELLED').length
     }
 
     return { totalSitting, totalTakeaway, totalDelivery, totalRevenue, totalTips, totalShifts }
