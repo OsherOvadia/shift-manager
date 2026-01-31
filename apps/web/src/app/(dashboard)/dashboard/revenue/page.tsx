@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, startOfWeek, addWeeks, subWeeks, addDays } from 'date-fns'
 import { he } from 'date-fns/locale'
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/use-toast'
 import {
   ChevronRight,
@@ -18,7 +19,11 @@ import {
   DollarSign,
   Coins,
   Save,
-  TrendingUp,
+  Users,
+  Clock,
+  CalendarDays,
+  Utensils,
+  Receipt,
 } from 'lucide-react'
 import { 
   PageTransition, 
@@ -28,11 +33,19 @@ import {
   motion,
   AnimatePresence
 } from '@/components/ui/animations'
+import { formatDateLocal } from '@/lib/utils'
 
-const HEBREW_DAYS = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳']
+const HEBREW_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
+const SHIFT_TYPES: Record<string, { label: string; color: string }> = {
+  MORNING: { label: 'בוקר', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' },
+  AFTERNOON: { label: 'צהריים', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
+  EVENING: { label: 'ערב', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
+  NIGHT: { label: 'לילה', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400' },
+}
 
 export default function RevenuePage() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }))
+  const [selectedDay, setSelectedDay] = useState<number>(0)
   const [revenueInputs, setRevenueInputs] = useState<{ [key: string]: string }>({})
   const [tipsInputs, setTipsInputs] = useState<{ [key: string]: string }>({})
   const [savingRevenue, setSavingRevenue] = useState<string | null>(null)
@@ -50,36 +63,64 @@ export default function RevenuePage() {
     return dates
   }, [weekStart])
 
-  // Fetch weekly report for the selected week
-  const { data: report, isLoading, isFetching } = useQuery({
-    queryKey: ['weekly-costs', weekStart.toISOString()],
-    queryFn: () => api.get(`/reports/weekly-costs?date=${weekStart.toISOString()}`, accessToken!),
-    enabled: !!accessToken,
-    staleTime: 1000 * 60 * 5,
-  })
+  const selectedDate = weekDates[selectedDay]
 
-  // Fetch shift assignments for tips entry
-  const { data: scheduleData } = useQuery({
-    queryKey: ['schedule-for-week', weekStart.toISOString()],
+  // Fetch schedule with shift assignments for the week
+  const { data: scheduleData, isLoading: scheduleLoading } = useQuery({
+    queryKey: ['schedule-week', weekStart.toISOString()],
     queryFn: () => api.get(`/schedules/week/${weekStart.toISOString()}`, accessToken!),
     enabled: !!accessToken,
   })
+
+  // Fetch daily revenues for the week
+  const { data: revenueData, isLoading: revenueLoading } = useQuery({
+    queryKey: ['daily-revenues', weekStart.toISOString()],
+    queryFn: () => api.get(`/daily-revenues?startDate=${weekStart.toISOString()}&endDate=${addWeeks(weekStart, 1).toISOString()}`, accessToken!),
+    enabled: !!accessToken,
+  })
+
+  const isLoading = scheduleLoading || revenueLoading
+
+  // Initialize revenue inputs from fetched data
+  useEffect(() => {
+    if (revenueData && Array.isArray(revenueData)) {
+      const newInputs: { [key: string]: string } = {}
+      revenueData.forEach((r: any) => {
+        const dateKey = formatDateLocal(new Date(r.date))
+        newInputs[dateKey] = r.totalRevenue.toString()
+      })
+      setRevenueInputs(prev => ({ ...newInputs, ...prev }))
+    }
+  }, [revenueData])
+
+  // Initialize tips inputs from schedule data
+  useEffect(() => {
+    if (scheduleData?.shiftAssignments) {
+      const newInputs: { [key: string]: string } = {}
+      scheduleData.shiftAssignments.forEach((a: any) => {
+        if (a.tipsEarned && a.tipsEarned > 0) {
+          newInputs[a.id] = a.tipsEarned.toString()
+        }
+      })
+      setTipsInputs(prev => ({ ...newInputs, ...prev }))
+    }
+  }, [scheduleData])
 
   const saveDailyRevenueMutation = useMutation({
     mutationFn: (data: { date: string; totalRevenue: number }) =>
       api.post('/daily-revenues', data, accessToken!),
     onSuccess: () => {
       toast({
-        title: 'נשמר',
-        description: 'הכנסה יומית נשמרה בהצלחה',
+        title: 'נשמר בהצלחה',
+        description: 'הכנסת היום נשמרה',
       })
-      queryClient.invalidateQueries({ queryKey: ['weekly-costs'] })
+      queryClient.invalidateQueries({ queryKey: ['daily-revenues'] })
       setSavingRevenue(null)
     },
     onError: (error: any) => {
       toast({
         title: 'שגיאה',
-        description: error.message || 'שגיאה בשמירת הכנסה',
+        description: error.message || 'לא ניתן לשמור את ההכנסה',
         variant: 'destructive',
       })
       setSavingRevenue(null)
@@ -90,13 +131,17 @@ export default function RevenuePage() {
     mutationFn: ({ assignmentId, tips }: { assignmentId: string; tips: number }) =>
       api.patch(`/assignments/${assignmentId}`, { tipsEarned: tips }, accessToken!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['weekly-costs'] })
+      toast({
+        title: 'נשמר',
+        description: 'הטיפ נשמר בהצלחה',
+      })
+      queryClient.invalidateQueries({ queryKey: ['schedule-week'] })
       setSavingTips(null)
     },
     onError: (error: any) => {
       toast({
         title: 'שגיאה',
-        description: error.message || 'שגיאה בשמירת טיפים',
+        description: error.message || 'לא ניתן לשמור את הטיפ',
         variant: 'destructive',
       })
       setSavingTips(null)
@@ -110,11 +155,12 @@ export default function RevenuePage() {
     return new Intl.NumberFormat('he-IL', {
       style: 'currency',
       currency: 'ILS',
+      maximumFractionDigits: 0,
     }).format(amount)
   }
 
   const handleSaveRevenue = (date: Date) => {
-    const dateKey = date.toISOString().split('T')[0]
+    const dateKey = formatDateLocal(date)
     const amount = parseFloat(revenueInputs[dateKey] || '0')
     
     if (isNaN(amount) || amount < 0) {
@@ -133,8 +179,8 @@ export default function RevenuePage() {
     })
   }
 
-  const handleSaveTips = (assignmentId: string, dateKey: string) => {
-    const amount = parseFloat(tipsInputs[`${assignmentId}`] || '0')
+  const handleSaveTips = (assignmentId: string) => {
+    const amount = parseFloat(tipsInputs[assignmentId] || '0')
     
     if (isNaN(amount) || amount < 0) {
       toast({
@@ -152,62 +198,41 @@ export default function RevenuePage() {
     })
   }
 
-  // Get existing revenue for a date
-  const getRevenueForDate = (date: Date) => {
-    const dateKey = date.toISOString().split('T')[0]
-    const dayData = report?.byDay?.find(
-      (d: any) => new Date(d.date).toISOString().split('T')[0] === dateKey
+  // Get shifts for a specific date
+  const getShiftsForDate = (date: Date) => {
+    if (!scheduleData?.shiftAssignments) return []
+    const dateStr = formatDateLocal(date)
+    return scheduleData.shiftAssignments.filter((a: any) => 
+      formatDateLocal(new Date(a.shiftDate)) === dateStr && a.status !== 'CANCELLED'
     )
-    return dayData?.revenue || 0
   }
 
-  // Get waiter shifts for a specific date
-  const getWaiterShiftsForDate = (date: Date) => {
-    const dateKey = date.toISOString().split('T')[0]
-    const shifts: any[] = []
-    
-    report?.byEmployee?.forEach((emp: any) => {
-      if (emp.user.isTipBased) {
-        emp.shifts?.forEach((shift: any) => {
-          const shiftDateKey = new Date(shift.date).toISOString().split('T')[0]
-          if (shiftDateKey === dateKey) {
-            shifts.push({
-              ...shift,
-              employee: emp.user,
-            })
-          }
-        })
-      }
-    })
-    
-    return shifts
+  // Get revenue for a specific date
+  const getRevenueForDate = (date: Date) => {
+    if (!revenueData || !Array.isArray(revenueData)) return null
+    const dateStr = formatDateLocal(date)
+    return revenueData.find((r: any) => formatDateLocal(new Date(r.date)) === dateStr)
   }
 
-  // Initialize inputs when report loads
-  useMemo(() => {
-    if (report?.byDay) {
-      const newRevenueInputs: { [key: string]: string } = {}
-      report.byDay.forEach((day: any) => {
-        const dateKey = new Date(day.date).toISOString().split('T')[0]
-        if (day.revenue > 0) {
-          newRevenueInputs[dateKey] = day.revenue.toString()
-        }
-      })
-      setRevenueInputs(prev => ({ ...newRevenueInputs, ...prev }))
+  // Calculate totals for summary
+  const weeklyTotals = useMemo(() => {
+    let totalRevenue = 0
+    let totalTips = 0
+    let totalShifts = 0
+
+    if (revenueData && Array.isArray(revenueData)) {
+      totalRevenue = revenueData.reduce((sum: number, r: any) => sum + (r.totalRevenue || 0), 0)
     }
-    
-    if (report?.byEmployee) {
-      const newTipsInputs: { [key: string]: string } = {}
-      report.byEmployee.forEach((emp: any) => {
-        emp.shifts?.forEach((shift: any) => {
-          if (shift.tips > 0) {
-            newTipsInputs[shift.assignmentId] = shift.tips.toString()
-          }
-        })
-      })
-      setTipsInputs(prev => ({ ...newTipsInputs, ...prev }))
+
+    if (scheduleData?.shiftAssignments) {
+      totalTips = scheduleData.shiftAssignments.reduce((sum: number, a: any) => sum + (a.tipsEarned || 0), 0)
+      totalShifts = scheduleData.shiftAssignments.filter((a: any) => a.status !== 'CANCELLED').length
     }
-  }, [report])
+
+    return { totalRevenue, totalTips, totalShifts }
+  }, [revenueData, scheduleData])
+
+  const shiftsForSelectedDay = getShiftsForDate(selectedDate)
 
   return (
     <PageTransition>
@@ -220,10 +245,10 @@ export default function RevenuePage() {
             transition={{ duration: 0.3 }}
           >
             <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-              הכנסות וטיפים
+              <Utensils className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              קופה וטיפים
             </h1>
-            <p className="text-sm text-muted-foreground">הזנת הכנסות יומיות וטיפים לעובדים</p>
+            <p className="text-sm text-muted-foreground">ניהול הכנסות יומיות וטיפים למשמרות</p>
           </motion.div>
 
           {/* Week Navigation */}
@@ -241,13 +266,13 @@ export default function RevenuePage() {
             <AnimatePresence mode="wait">
               <motion.span 
                 key={weekStart.toISOString()}
-                className="min-w-[120px] sm:min-w-[160px] text-center text-xs sm:text-sm font-medium"
+                className="min-w-[140px] sm:min-w-[180px] text-center text-xs sm:text-sm font-medium"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                {format(weekStart, 'dd/MM', { locale: he })} - {format(addWeeks(weekStart, 1), 'dd/MM/yy', { locale: he })}
+                {format(weekStart, 'dd MMM', { locale: he })} - {format(addDays(weekStart, 6), 'dd MMM yyyy', { locale: he })}
               </motion.span>
             </AnimatePresence>
             <ScaleOnTap>
@@ -255,227 +280,232 @@ export default function RevenuePage() {
                 <ChevronLeft className="h-4 w-4" />
               </Button>
             </ScaleOnTap>
-            {isFetching && (
-              <motion.div 
-                className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-              />
-            )}
           </motion.div>
         </div>
 
-        {/* Content */}
-        {isLoading ? (
-          <div className="grid gap-4">
-            {[1, 2, 3].map((i) => (
-              <Card key={i}>
-                <CardContent className="p-4">
-                  <div className="h-4 bg-muted rounded animate-pulse w-1/4 mb-3" />
-                  <div className="h-10 bg-muted rounded animate-pulse w-full" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Daily Revenue Entry */}
-            <Card>
-              <CardHeader className="p-4 sm:p-6 pb-2">
-                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-emerald-500" />
-                  הכנסות יומיות
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
-                  {weekDates.map((date, index) => {
-                    const dateKey = date.toISOString().split('T')[0]
-                    const existingRevenue = getRevenueForDate(date)
-                    const dayData = report?.byDay?.find(
-                      (d: any) => new Date(d.date).toISOString().split('T')[0] === dateKey
-                    )
-                    
-                    return (
-                      <div key={index} className="p-3 bg-muted rounded-lg space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-sm">
-                            {HEBREW_DAYS[date.getDay()]} {format(date, 'dd/MM', { locale: he })}
-                          </span>
-                        </div>
-                        
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">הכנסה (₪)</Label>
-                          <div className="flex gap-1">
-                            <Input
-                              type="number"
-                              placeholder="0"
-                              value={revenueInputs[dateKey] ?? (existingRevenue > 0 ? existingRevenue.toString() : '')}
-                              onChange={(e) => setRevenueInputs(prev => ({
-                                ...prev,
-                                [dateKey]: e.target.value
-                              }))}
-                              className="h-8 text-sm"
-                              min="0"
-                            />
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="h-8 px-2"
-                              onClick={() => handleSaveRevenue(date)}
-                              disabled={savingRevenue === dateKey}
-                            >
-                              {savingRevenue === dateKey ? (
-                                <motion.div 
-                                  className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full"
-                                  animate={{ rotate: 360 }}
-                                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                                />
-                              ) : (
-                                <Save className="h-3 w-3" />
-                              )}
-                            </Button>
-                          </div>
-                        </div>
-
-                        {dayData && (
-                          <div className="text-[10px] text-muted-foreground pt-1 border-t">
-                            שכר: {formatCurrency(dayData.totalCost || 0)}
-                            {dayData.revenue > 0 && (
-                              <span className={dayData.salaryPercentage > 50 ? ' text-red-500' : ' text-green-500'}>
-                                {' '}({dayData.salaryPercentage?.toFixed(0)}%)
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+        {/* Weekly Summary Cards */}
+        <StaggerContainer className="grid grid-cols-3 gap-3 sm:gap-4">
+          <StaggerItem>
+            <Card className="bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border-emerald-200 dark:border-emerald-800">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Receipt className="h-4 w-4 text-emerald-600" />
+                  <span className="text-xs text-emerald-700 dark:text-emerald-400">סה״כ קופה</span>
+                </div>
+                <div className="text-lg sm:text-xl font-bold text-emerald-700 dark:text-emerald-400">
+                  {formatCurrency(weeklyTotals.totalRevenue)}
                 </div>
               </CardContent>
             </Card>
-
-            {/* Tips Entry for Waiters */}
-            <Card>
-              <CardHeader className="p-4 sm:p-6 pb-2">
-                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                  <Coins className="h-5 w-5 text-amber-500" />
-                  טיפים למלצרים
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-2">
-                {weekDates.map((date, dayIndex) => {
-                  const waiterShifts = getWaiterShiftsForDate(date)
-                  
-                  if (waiterShifts.length === 0) return null
-                  
-                  return (
-                    <div key={dayIndex} className="mb-4 last:mb-0">
-                      <h3 className="font-medium text-sm mb-2 flex items-center gap-2">
-                        <Badge variant="outline">{HEBREW_DAYS[date.getDay()]}</Badge>
-                        {format(date, 'dd/MM', { locale: he })}
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                        {waiterShifts.map((shift: any, shiftIndex: number) => (
-                          <div key={shiftIndex} className="p-3 bg-muted rounded-lg">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium text-sm">
-                                {shift.employee.firstName} {shift.employee.lastName}
-                              </span>
-                              <Badge variant="secondary" className="text-[10px]">
-                                {shift.shiftTemplate.name}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1">
-                                <Label className="text-xs text-muted-foreground">טיפים (₪)</Label>
-                                <div className="flex gap-1">
-                                  <Input
-                                    type="number"
-                                    placeholder="0"
-                                    value={tipsInputs[shift.assignmentId] ?? (shift.tips > 0 ? shift.tips.toString() : '')}
-                                    onChange={(e) => setTipsInputs(prev => ({
-                                      ...prev,
-                                      [shift.assignmentId]: e.target.value
-                                    }))}
-                                    className="h-8 text-sm"
-                                    min="0"
-                                  />
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
-                                    className="h-8 px-2"
-                                    onClick={() => handleSaveTips(shift.assignmentId, date.toISOString())}
-                                    disabled={savingTips === shift.assignmentId}
-                                  >
-                                    {savingTips === shift.assignmentId ? (
-                                      <motion.div 
-                                        className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full"
-                                        animate={{ rotate: 360 }}
-                                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                                      />
-                                    ) : (
-                                      <Save className="h-3 w-3" />
-                                    )}
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="text-[10px] text-muted-foreground mt-1">
-                              {shift.hours.toFixed(1)} שעות | בסיס: {shift.employee.baseHourlyWage} ₪/שעה
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-                
-                {!report?.byEmployee?.some((emp: any) => emp.user.isTipBased) && (
-                  <p className="text-muted-foreground text-center py-4 text-sm">
-                    אין עובדים מבוססי טיפים במערכת
-                  </p>
-                )}
+          </StaggerItem>
+          <StaggerItem>
+            <Card className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border-amber-200 dark:border-amber-800">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Coins className="h-4 w-4 text-amber-600" />
+                  <span className="text-xs text-amber-700 dark:text-amber-400">סה״כ טיפים</span>
+                </div>
+                <div className="text-lg sm:text-xl font-bold text-amber-700 dark:text-amber-400">
+                  {formatCurrency(weeklyTotals.totalTips)}
+                </div>
               </CardContent>
             </Card>
+          </StaggerItem>
+          <StaggerItem>
+            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Users className="h-4 w-4 text-blue-600" />
+                  <span className="text-xs text-blue-700 dark:text-blue-400">משמרות</span>
+                </div>
+                <div className="text-lg sm:text-xl font-bold text-blue-700 dark:text-blue-400">
+                  {weeklyTotals.totalShifts}
+                </div>
+              </CardContent>
+            </Card>
+          </StaggerItem>
+        </StaggerContainer>
 
-            {/* Summary */}
-            {report?.summary && (
-              <Card>
-                <CardHeader className="p-4 sm:p-6 pb-2">
-                  <CardTitle className="text-base sm:text-lg">סיכום שבועי</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 sm:p-6 pt-2">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div className="text-center p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
-                      <div className="text-lg font-bold text-emerald-600">
-                        {formatCurrency(report.summary.totalRevenue || 0)}
+        {isLoading ? (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-center gap-2">
+                <motion.div 
+                  className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                />
+                <span className="text-muted-foreground">טוען נתונים...</span>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* Day Selector Tabs */}
+            <Tabs value={selectedDay.toString()} onValueChange={(v) => setSelectedDay(parseInt(v))} className="w-full">
+              <TabsList className="w-full grid grid-cols-7 h-auto p-1">
+                {weekDates.map((date, index) => {
+                  const dayShifts = getShiftsForDate(date)
+                  const dayRevenue = getRevenueForDate(date)
+                  const hasData = dayShifts.length > 0 || dayRevenue
+                  
+                  return (
+                    <TabsTrigger
+                      key={index}
+                      value={index.toString()}
+                      className="flex flex-col gap-0.5 py-2 px-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                    >
+                      <span className="text-[10px] sm:text-xs font-medium">{HEBREW_DAYS[date.getDay()]}</span>
+                      <span className="text-[10px] text-muted-foreground data-[state=active]:text-primary-foreground/70">
+                        {format(date, 'd/M')}
+                      </span>
+                      {hasData && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 data-[state=active]:bg-emerald-300" />
+                      )}
+                    </TabsTrigger>
+                  )
+                })}
+              </TabsList>
+
+              {weekDates.map((date, index) => (
+                <TabsContent key={index} value={index.toString()} className="mt-4 space-y-4">
+                  {/* Daily Revenue Card */}
+                  <Card>
+                    <CardHeader className="p-4 pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-emerald-500" />
+                        הכנסת קופה - יום {HEBREW_DAYS[date.getDay()]} {format(date, 'd בMMMM', { locale: he })}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-2">
+                      <div className="flex items-end gap-3">
+                        <div className="flex-1 max-w-xs">
+                          <Label className="text-sm text-muted-foreground mb-1 block">סכום הכנסה מהקופה (₪)</Label>
+                          <Input
+                            type="number"
+                            placeholder="הזן סכום..."
+                            value={revenueInputs[formatDateLocal(date)] || ''}
+                            onChange={(e) => setRevenueInputs(prev => ({
+                              ...prev,
+                              [formatDateLocal(date)]: e.target.value
+                            }))}
+                            className="h-12 text-lg"
+                            min="0"
+                          />
+                        </div>
+                        <Button 
+                          size="lg"
+                          onClick={() => handleSaveRevenue(date)}
+                          disabled={savingRevenue === formatDateLocal(date)}
+                          className="h-12 px-6"
+                        >
+                          {savingRevenue === formatDateLocal(date) ? (
+                            <motion.div 
+                              className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                            />
+                          ) : (
+                            <>
+                              <Save className="h-4 w-4 ml-2" />
+                              שמור
+                            </>
+                          )}
+                        </Button>
                       </div>
-                      <div className="text-xs text-muted-foreground">סה״כ הכנסות</div>
-                    </div>
-                    <div className="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                      <div className="text-lg font-bold text-red-600">
-                        {formatCurrency(report.summary.totalCost || 0)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">סה״כ שכר</div>
-                    </div>
-                    <div className="text-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                      <div className="text-lg font-bold text-amber-600">
-                        {formatCurrency(report.summary.totalTips || 0)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">סה״כ טיפים</div>
-                    </div>
-                    <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <div className="text-lg font-bold text-blue-600">
-                        {report.summary.profitMargin?.toFixed(1) || 0}%
-                      </div>
-                      <div className="text-xs text-muted-foreground">רווח</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Shifts Tips Entry */}
+                  <Card>
+                    <CardHeader className="p-4 pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Coins className="h-5 w-5 text-amber-500" />
+                        טיפים למשמרות ({shiftsForSelectedDay.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-2">
+                      {shiftsForSelectedDay.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <CalendarDays className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                          <p>אין משמרות ביום זה</p>
+                          <p className="text-sm">שבץ עובדים למשמרות כדי להזין טיפים</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {shiftsForSelectedDay.map((assignment: any) => (
+                            <div 
+                              key={assignment.id} 
+                              className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border"
+                            >
+                              {/* Employee Info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-medium truncate">
+                                    {assignment.user?.firstName} {assignment.user?.lastName}
+                                  </span>
+                                  <Badge 
+                                    className={SHIFT_TYPES[assignment.shiftTemplate?.shiftType]?.color || 'bg-gray-100'}
+                                  >
+                                    {SHIFT_TYPES[assignment.shiftTemplate?.shiftType]?.label || assignment.shiftTemplate?.name}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {assignment.shiftTemplate?.startTime} - {assignment.shiftTemplate?.endTime}
+                                  </span>
+                                  {assignment.user?.jobCategory && (
+                                    <Badge variant="outline" className="text-[10px]">
+                                      {assignment.user.jobCategory.nameHe || assignment.user.jobCategory.name}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Tips Input */}
+                              <div className="flex items-center gap-2">
+                                <div className="w-24">
+                                  <Input
+                                    type="number"
+                                    placeholder="טיפ ₪"
+                                    value={tipsInputs[assignment.id] || ''}
+                                    onChange={(e) => setTipsInputs(prev => ({
+                                      ...prev,
+                                      [assignment.id]: e.target.value
+                                    }))}
+                                    className="h-9 text-center"
+                                    min="0"
+                                  />
+                                </div>
+                                <Button 
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleSaveTips(assignment.id)}
+                                  disabled={savingTips === assignment.id}
+                                  className="h-9 w-9 p-0"
+                                >
+                                  {savingTips === assignment.id ? (
+                                    <motion.div 
+                                      className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full"
+                                      animate={{ rotate: 360 }}
+                                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                    />
+                                  ) : (
+                                    <Save className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              ))}
+            </Tabs>
+          </>
         )}
       </div>
     </PageTransition>

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request, Query } from '@nestjs/common';
 import { SchedulesService } from './schedules.service';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
@@ -14,6 +14,11 @@ export class SchedulesController {
   @Get()
   async findAll(@Request() req: any) {
     return this.schedulesService.findAll(req.user.organizationId);
+  }
+
+  @Get('week/:date')
+  async getByWeek(@Param('date') date: string, @Request() req: any) {
+    return this.schedulesService.getByWeekDate(new Date(date), req.user.organizationId);
   }
 
   @Get(':id')

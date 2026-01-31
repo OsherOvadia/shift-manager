@@ -196,6 +196,66 @@ export class SchedulesService {
     return { message: 'לוח המשמרות נמחק בהצלחה' };
   }
 
+  async getByWeekDate(date: Date, organizationId: string) {
+    const weekStartDate = this.normalizeToWeekStart(date);
+    
+    const schedule = await this.prisma.weeklySchedule.findFirst({
+      where: { 
+        organizationId,
+        weekStartDate,
+      },
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        shiftAssignments: {
+          where: {
+            status: { not: 'CANCELLED' },
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                employmentType: true,
+                hourlyWage: true,
+                baseHourlyWage: true,
+                isTipBased: true,
+                jobCategory: {
+                  select: {
+                    id: true,
+                    name: true,
+                    nameHe: true,
+                    color: true,
+                  },
+                },
+              },
+            },
+            shiftTemplate: true,
+          },
+          orderBy: [{ shiftDate: 'asc' }, { shiftTemplate: { shiftType: 'asc' } }],
+        },
+      },
+    });
+
+    // Return empty structure if no schedule exists for the week
+    if (!schedule) {
+      return {
+        id: null,
+        weekStartDate,
+        status: 'NONE',
+        shiftAssignments: [],
+      };
+    }
+
+    return schedule;
+  }
+
   private normalizeToWeekStart(date: Date): Date {
     const d = new Date(date);
     const day = d.getDay();
