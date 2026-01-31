@@ -150,13 +150,16 @@ export default function RevenuePage() {
           tipsEarned: tips 
         }, accessToken!)
       )),
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Refetch the specific week's data immediately
+      await queryClient.refetchQueries({ queryKey: ['schedule-week', weekStart.toISOString()] })
+      queryClient.invalidateQueries({ queryKey: ['weekly-costs'] })
+      queryClient.invalidateQueries({ queryKey: ['daily-revenues'] })
+      
       toast({
         title: 'נשמר בהצלחה',
         description: 'נתוני המשמרת נשמרו',
       })
-      queryClient.invalidateQueries({ queryKey: ['schedule-week'] })
-      queryClient.invalidateQueries({ queryKey: ['weekly-costs'] })
       setSavingData(null)
     },
     onError: (error: any) => {
