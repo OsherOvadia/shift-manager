@@ -44,6 +44,16 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setAuth: (user, accessToken, refreshToken, rememberMe = true) => {
+        // Also save tokens to cookies as backup
+        if (typeof document !== 'undefined') {
+          const expires = rememberMe 
+            ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString() // 30 days
+            : new Date(Date.now() + 24 * 60 * 60 * 1000).toUTCString(); // 1 day
+          
+          document.cookie = `refreshToken=${refreshToken}; expires=${expires}; path=/; SameSite=Strict`;
+          document.cookie = `rememberMe=${rememberMe}; expires=${expires}; path=/; SameSite=Strict`;
+        }
+        
         set({
           user,
           accessToken,
@@ -58,6 +68,13 @@ export const useAuthStore = create<AuthState>()(
         if (refreshToken) {
           api.post('/auth/logout', { refreshToken }).catch(() => {})
         }
+        
+        // Clear cookies
+        if (typeof document !== 'undefined') {
+          document.cookie = 'refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+          document.cookie = 'rememberMe=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        }
+        
         set({
           user: null,
           accessToken: null,
@@ -77,19 +94,49 @@ export const useAuthStore = create<AuthState>()(
       // Custom storage that uses localStorage for "Remember Me" or sessionStorage for current session only
       storage: {
         getItem: (name) => {
-          // Check sessionStorage first (most recent if both exist)
+          // Try localStorage first
+          const localData = localStorage.getItem(name)
+          if (localData) {
+            try {
+              const parsed = JSON.parse(localData)
+              // Check if rememberMe is true, if so use it
+              if (parsed.state?.rememberMe === true) {
+                return localData
+              }
+            } catch {}
+          }
+          
+          // Then try sessionStorage
           const sessionData = sessionStorage.getItem(name)
           if (sessionData) return sessionData
           
-          // Then check localStorage (for "Remember Me")
-          const localData = localStorage.getItem(name)
-          return localData || null
+          // Finally, try to restore from cookies as fallback
+          if (typeof document !== 'undefined') {
+            const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+              const [key, value] = cookie.trim().split('=')
+              acc[key] = value
+              return acc
+            }, {} as Record<string, string>)
+            
+            if (cookies.refreshToken && cookies.rememberMe === 'true') {
+              // Reconstruct basic auth state from cookies
+              return JSON.stringify({
+                state: {
+                  refreshToken: cookies.refreshToken,
+                  rememberMe: true,
+                  isAuthenticated: true,
+                },
+                version: 0,
+              })
+            }
+          }
+          
+          return null
         },
         setItem: (name, value) => {
           try {
-            // Parse the value to check rememberMe flag
             const parsedValue = JSON.parse(value)
-            const rememberMe = parsedValue.state?.rememberMe ?? false // Default to false (session only)
+            const rememberMe = parsedValue.state?.rememberMe ?? true // Default to true
             
             if (rememberMe) {
               // Save to localStorage (persists across browser sessions)
@@ -101,8 +148,8 @@ export const useAuthStore = create<AuthState>()(
               localStorage.removeItem(name)
             }
           } catch {
-            // Fallback to sessionStorage if parsing fails (safer default)
-            sessionStorage.setItem(name, value)
+            // Fallback to localStorage
+            localStorage.setItem(name, value)
           }
         },
         removeItem: (name) => {
@@ -118,7 +165,19 @@ export const useAuthStore = create<AuthState>()(
 )
 
 export async function refreshAccessToken(): Promise<string | null> {
-  const { refreshToken, rememberMe, setAuth, logout } = useAuthStore.getState()
+  let { refreshToken, rememberMe, setAuth, logout } = useAuthStore.getState()
+
+  // If no refresh token in state, try to get it from cookies
+  if (!refreshToken && typeof document !== 'undefined') {
+    const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+      const [key, value] = cookie.trim().split('=')
+      acc[key] = value
+      return acc
+    }, {} as Record<string, string>)
+    
+    refreshToken = cookies.refreshToken || null
+    rememberMe = cookies.rememberMe === 'true'
+  }
 
   if (!refreshToken) {
     logout()

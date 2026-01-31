@@ -48,7 +48,7 @@ export default function LoginPage() {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      rememberMe: false,
+      rememberMe: true, // Default to true so users stay logged in
     },
   })
 
