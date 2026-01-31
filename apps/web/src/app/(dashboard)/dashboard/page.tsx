@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   Briefcase,
   DollarSign,
+  TrendingUp,
 } from 'lucide-react'
 import { PageTransition, StaggerContainer, StaggerItem, motion } from '@/components/ui/animations'
 
@@ -28,18 +29,18 @@ export default function DashboardPage() {
   const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 })
   const nextWeekStart = addWeeks(currentWeekStart, 1)
 
-  // Fetch user's shifts for this week
+  // Fetch user's shifts for this week (only for employees, not managers/admins)
   const { data: mySchedule } = useQuery({
     queryKey: ['my-schedule', currentWeekStart.toISOString()],
     queryFn: () => api.get(`/schedules/my-week/${currentWeekStart.toISOString()}`, accessToken!),
-    enabled: !!accessToken && !!user,
+    enabled: !!accessToken && !!user && !isManagerRole,
   })
 
-  // Fetch user's availability status for next week
+  // Fetch user's availability status for next week (only for employees, not managers/admins)
   const { data: myAvailability } = useQuery({
     queryKey: ['my-availability', nextWeekStart.toISOString()],
     queryFn: () => api.get(`/availability/week/${nextWeekStart.toISOString()}`, accessToken!),
-    enabled: !!accessToken && !!user,
+    enabled: !!accessToken && !!user && !isManagerRole,
   })
 
   // Fetch employees (for managers)
@@ -58,8 +59,9 @@ export default function DashboardPage() {
 
   // Calculate stats
   const myShiftsCount = mySchedule?.shiftAssignments?.length || 0
-  const activeEmployeesCount = employees?.filter((e: any) => e.isActive && e.isApproved).length || 0
-  const totalEmployees = employees?.filter((e: any) => e.isApproved).length || 0
+  // API /users/employees already filters by isActive and isApproved, so just count the length
+  const activeEmployeesCount = employees?.length || 0
+  const totalEmployees = employees?.length || 0
   const pendingAvailability = allAvailability?.filter((a: any) => a.status === 'PENDING' || !a.submittedAt).length || 0
   const availabilityStatus = myAvailability?.status || 'NOT_SUBMITTED'
 
@@ -93,54 +95,58 @@ export default function DashboardPage() {
 
         {/* Quick Stats */}
         <StaggerContainer className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          <StaggerItem>
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium leading-tight">המשמרות שלי השבוע</CardTitle>
-                <Calendar className="h-4 w-4 text-blue-500 flex-shrink-0" />
-              </CardHeader>
-              <CardContent className="p-3 sm:p-4 pt-0">
-                <div className="text-xl sm:text-2xl font-bold text-blue-600">{myShiftsCount}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">
-                  משמרות מתוכננות
-                </p>
-              </CardContent>
-            </Card>
-          </StaggerItem>
+          {!isManagerRole && (
+            <>
+              <StaggerItem>
+                <Card className="h-full">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-2">
+                    <CardTitle className="text-xs sm:text-sm font-medium leading-tight">המשמרות שלי השבוע</CardTitle>
+                    <Calendar className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                  </CardHeader>
+                  <CardContent className="p-3 sm:p-4 pt-0">
+                    <div className="text-xl sm:text-2xl font-bold text-blue-600">{myShiftsCount}</div>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
+                      משמרות מתוכננות
+                    </p>
+                  </CardContent>
+                </Card>
+              </StaggerItem>
 
-          <StaggerItem>
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium leading-tight">סטטוס זמינות</CardTitle>
-                <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
-              </CardHeader>
-              <CardContent className="p-3 sm:p-4 pt-0">
-                {availabilityStatus === 'APPROVED' ? (
-                  <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[10px] sm:text-xs">
-                    אושר
-                  </Badge>
-                ) : availabilityStatus === 'PENDING' ? (
-                  <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] sm:text-xs">
-                    ממתין לאישור
-                  </Badge>
-                ) : availabilityStatus === 'REJECTED' ? (
-                  <Badge variant="destructive" className="text-[10px] sm:text-xs">
-                    נדחה
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] sm:text-xs">
-                    טרם הוגש
-                  </Badge>
-                )}
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1.5">
-                  {availabilityStatus === 'APPROVED' ? 'הזמינות לשבוע הבא אושרה' : 
-                   availabilityStatus === 'PENDING' ? 'הזמינות שלך ממתינה לאישור' :
-                   availabilityStatus === 'REJECTED' ? 'יש לעדכן את הזמינות' :
-                   'יש להגיש זמינות לשבוע הבא'}
-                </p>
-              </CardContent>
-            </Card>
-          </StaggerItem>
+              <StaggerItem>
+                <Card className="h-full">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-2">
+                    <CardTitle className="text-xs sm:text-sm font-medium leading-tight">סטטוס זמינות</CardTitle>
+                    <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                  </CardHeader>
+                  <CardContent className="p-3 sm:p-4 pt-0">
+                    {availabilityStatus === 'APPROVED' ? (
+                      <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[10px] sm:text-xs">
+                        אושר
+                      </Badge>
+                    ) : availabilityStatus === 'PENDING' ? (
+                      <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] sm:text-xs">
+                        ממתין לאישור
+                      </Badge>
+                    ) : availabilityStatus === 'REJECTED' ? (
+                      <Badge variant="destructive" className="text-[10px] sm:text-xs">
+                        נדחה
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] sm:text-xs">
+                        טרם הוגש
+                      </Badge>
+                    )}
+                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-1.5">
+                      {availabilityStatus === 'APPROVED' ? 'הזמינות לשבוע הבא אושרה' : 
+                       availabilityStatus === 'PENDING' ? 'הזמינות שלך ממתינה לאישור' :
+                       availabilityStatus === 'REJECTED' ? 'יש לעדכן את הזמינות' :
+                       'יש להגיש זמינות לשבוע הבא'}
+                    </p>
+                  </CardContent>
+                </Card>
+              </StaggerItem>
+            </>
+          )}
 
           {isManagerRole && (
             <>
@@ -263,6 +269,23 @@ export default function DashboardPage() {
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm sm:text-base">דוחות עלויות</div>
                           <div className="text-xs text-muted-foreground truncate">צפה בעלויות שבועיות</div>
+                        </div>
+                        <ChevronLeft className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </motion.div>
+
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Link href="/dashboard/revenue">
+                    <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
+                      <CardContent className="p-4 flex items-center gap-3">
+                        <div className="p-2 sm:p-3 rounded-xl bg-teal-100 dark:bg-teal-900/30">
+                          <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-teal-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm sm:text-base">הכנסות וטיפים</div>
+                          <div className="text-xs text-muted-foreground truncate">הזנת הכנסות יומיות וטיפים</div>
                         </div>
                         <ChevronLeft className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                       </CardContent>

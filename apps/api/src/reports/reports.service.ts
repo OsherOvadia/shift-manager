@@ -12,7 +12,7 @@ export class ReportsService {
   async getWeeklyShiftCosts(organizationId: string, weekStartDate: Date) {
     const startDate = this.normalizeToWeekStart(weekStartDate);
     const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 7);
+    endDate.setUTCDate(endDate.getUTCDate() + 7);
 
     // Get all shift assignments for the week
     const assignments = await this.prisma.shiftAssignment.findMany({
@@ -170,10 +170,12 @@ export class ReportsService {
     const dailyCosts: { date: Date; totalHours: number; totalCost: number; employeeCount: number }[] = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(startDate);
-      date.setDate(date.getDate() + i);
+      date.setUTCDate(date.getUTCDate() + i);
       
+      // Compare dates using UTC date strings to avoid timezone issues
+      const dateStr = date.toISOString().split('T')[0];
       const dayAssignments = assignments.filter(
-        a => new Date(a.shiftDate).toDateString() === date.toDateString()
+        a => new Date(a.shiftDate).toISOString().split('T')[0] === dateStr
       );
 
       let totalHours = 0;
@@ -339,10 +341,10 @@ export class ReportsService {
 
   private normalizeToWeekStart(date: Date): Date {
     const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day;
-    d.setDate(diff);
-    d.setHours(0, 0, 0, 0);
+    // Use UTC methods to avoid timezone shifts when parsing ISO dates
+    const day = d.getUTCDay();
+    d.setUTCDate(d.getUTCDate() - day);
+    d.setUTCHours(0, 0, 0, 0);
     return d;
   }
 }

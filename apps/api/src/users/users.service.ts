@@ -242,6 +242,8 @@ export class UsersService {
         lastName: true,
         employmentType: true,
         hourlyWage: true,
+        isActive: true,
+        isApproved: true,
         jobCategory: {
           select: {
             id: true,

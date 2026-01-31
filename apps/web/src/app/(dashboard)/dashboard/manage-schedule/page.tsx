@@ -18,7 +18,7 @@ import {
 import { useToast } from '@/components/ui/use-toast'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
-import { getWeekStartDate, getWeekDates, getDayName, formatShortDate, isWeekend, formatDateLocal } from '@/lib/utils'
+import { getWeekStartDate, getWeekDates, getDayName, getDayLetter, formatShortDate, isWeekend, formatDateLocal } from '@/lib/utils'
 import { Loader2, ChevronRight, ChevronLeft, Plus, Trash2, Send, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -35,7 +35,7 @@ export default function ManageSchedulePage() {
   const queryClient = useQueryClient()
   const { accessToken } = useAuthStore()
   
-  const [weekOffset, setWeekOffset] = useState(0)
+  const [weekOffset, setWeekOffset] = useState(1) // Default to next week
   const [weekendDays, setWeekendDays] = useState<number[]>([4, 5, 6]) // Thu, Fri, Sat
   const [selectedShift, setSelectedShift] = useState<{ date: Date; shiftType: string } | null>(null)
   const [selectedWorkers, setSelectedWorkers] = useState<string[]>([])
@@ -419,11 +419,11 @@ export default function ManageSchedulePage() {
                       <th
                         key={date.toISOString()}
                         className={cn(
-                          'p-4 text-center font-medium min-w-[160px]',
+                          'p-4 text-center font-medium min-w-[120px]',
                           isWeekend(date, weekendDays) && 'bg-blue-100 dark:bg-blue-950'
                         )}
                       >
-                        <div>{getDayName(date)}</div>
+                        <div className="text-lg">{getDayLetter(date)}</div>
                         <div className="text-sm text-muted-foreground">
                           {formatShortDate(date)}
                         </div>
@@ -535,8 +535,7 @@ export default function ManageSchedulePage() {
                           const isAssigned = scheduleDetails?.shiftAssignments?.some(
                             (a: any) =>
                               a.userId === emp.id &&
-                              new Date(a.shiftDate).toISOString().split('T')[0] ===
-                                selectedShift.date.toISOString().split('T')[0] &&
+                              formatDateLocal(new Date(a.shiftDate)) === formatDateLocal(selectedShift.date) &&
                               a.shiftTemplate.shiftType === selectedShift.shiftType
                           )
                           
@@ -588,8 +587,7 @@ export default function ManageSchedulePage() {
                           const isAssigned = scheduleDetails?.shiftAssignments?.some(
                             (a: any) =>
                               a.userId === emp.id &&
-                              new Date(a.shiftDate).toISOString().split('T')[0] ===
-                                selectedShift.date.toISOString().split('T')[0] &&
+                              formatDateLocal(new Date(a.shiftDate)) === formatDateLocal(selectedShift.date) &&
                               a.shiftTemplate.shiftType === selectedShift.shiftType
                           )
                           

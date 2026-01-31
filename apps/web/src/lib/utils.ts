@@ -32,10 +32,18 @@ const HEBREW_DAY_NAMES = [
   'יום שבת',      // Saturday (6)
 ]
 
+const HEBREW_DAY_LETTERS = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳']
+
 export function getDayName(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date
   const dayIndex = d.getDay()
   return HEBREW_DAY_NAMES[dayIndex]
+}
+
+export function getDayLetter(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  const dayIndex = d.getDay()
+  return HEBREW_DAY_LETTERS[dayIndex]
 }
 
 export function getWeekStartDate(date: Date = new Date()): Date {
