@@ -41,6 +41,7 @@ const SHIFT_TYPES: Record<string, { label: string; color: string }> = {
   MORNING: { label: 'בוקר', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' },
   AFTERNOON: { label: 'צהריים', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
   EVENING: { label: 'ערב', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
+  EVENING_COMBINED: { label: 'ערב (כולל סגירה)', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
   NIGHT: { label: 'לילה', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400' },
 }
 
@@ -203,24 +204,37 @@ export default function RevenuePage() {
       return assignmentDateStr === dateStr
     })
     
-    // Group by shift type
+    // Group by shift type - combine EVENING and EVENING_CLOSE into one "EVENING" group
     const grouped = new Map<string, { 
       shiftType: string; 
+      displayType: string; // Original type for display
       shiftTemplate: any; 
       workers: any[];
       assignmentIds: string[];
     }>()
     
     assignments.forEach((a: any) => {
-      const shiftType = a.shiftTemplate.shiftType
+      const originalType = a.shiftTemplate.shiftType
+      // Combine EVENING and EVENING_CLOSE into EVENING for revenue entry
+      const shiftType = (originalType === 'EVENING_CLOSE') ? 'EVENING' : originalType
+      
       if (!grouped.has(shiftType)) {
         grouped.set(shiftType, {
           shiftType,
+          displayType: originalType,
           shiftTemplate: a.shiftTemplate,
           workers: [],
           assignmentIds: []
         })
+      } else {
+        // If we already have EVENING and now adding EVENING_CLOSE (or vice versa),
+        // update the display to show it includes both
+        if ((originalType === 'EVENING' || originalType === 'EVENING_CLOSE') && 
+            grouped.get(shiftType)!.displayType !== originalType) {
+          grouped.get(shiftType)!.displayType = 'EVENING_COMBINED'
+        }
       }
+      
       grouped.get(shiftType)!.workers.push(a.user)
       grouped.get(shiftType)!.assignmentIds.push(a.id)
     })
@@ -449,9 +463,9 @@ export default function RevenuePage() {
                                 <div className="flex items-center justify-between mb-3">
                                   <div className="flex items-center gap-3">
                                     <Badge 
-                                      className={SHIFT_TYPES[shiftGroup.shiftType]?.color || 'bg-gray-100'}
+                                      className={SHIFT_TYPES[shiftGroup.displayType]?.color || SHIFT_TYPES[shiftGroup.shiftType]?.color || 'bg-gray-100'}
                                     >
-                                      {SHIFT_TYPES[shiftGroup.shiftType]?.label || shiftGroup.shiftTemplate.name}
+                                      {SHIFT_TYPES[shiftGroup.displayType]?.label || SHIFT_TYPES[shiftGroup.shiftType]?.label || shiftGroup.shiftTemplate.name}
                                     </Badge>
                                     <span className="text-sm text-muted-foreground">
                                       <Clock className="h-3 w-3 inline ml-1" />
@@ -582,6 +596,94 @@ export default function RevenuePage() {
                       )}
                     </CardContent>
                   </Card>
+
+                  {/* Daily Financial Summary */}
+                  {shiftsForSelectedDay.length > 0 && (
+                    <Card className="bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-emerald-950/20 dark:to-blue-950/20 border-emerald-200 dark:border-emerald-800">
+                      <CardHeader className="p-4 pb-2">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <DollarSign className="h-5 w-5 text-emerald-600" />
+                          סיכום יומי - {HEBREW_DAYS[date.getDay()]} {format(date, 'd/M')}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-2">
+                        {(() => {
+                          // Calculate daily totals
+                          let totalRevenue = 0
+                          let totalTips = 0
+                          let totalWorkerWages = 0
+                          
+                          shiftsForSelectedDay.forEach((shiftGroup: any) => {
+                            const shiftKey = getShiftKey(date, shiftGroup.shiftType)
+                            
+                            // Revenue
+                            const sitting = parseFloat(sittingRevenue[shiftKey] || '0')
+                            const takeaway = parseFloat(takeawayRevenue[shiftKey] || '0')
+                            const delivery = parseFloat(deliveryRevenue[shiftKey] || '0')
+                            const tipsValue = parseFloat(tips[shiftKey] || '0')
+                            
+                            totalRevenue += sitting + takeaway + delivery
+                            totalTips += tipsValue
+                            
+                            // Worker wages (calculate based on shift hours and wage)
+                            shiftGroup.workers.forEach((worker: any) => {
+                              const startTime = shiftGroup.shiftTemplate.startTime
+                              const endTime = shiftGroup.shiftTemplate.endTime
+                              
+                              // Parse times (format: "HH:MM")
+                              const [startH, startM] = startTime.split(':').map(Number)
+                              const [endH, endM] = endTime.split(':').map(Number)
+                              
+                              let hours = (endH + endM / 60) - (startH + startM / 60)
+                              // Handle overnight shifts (e.g., 18:00 - 00:00)
+                              if (hours < 0) hours += 24
+                              
+                              const hourlyWage = worker.hourlyWage || 0
+                              totalWorkerWages += hours * hourlyWage
+                            })
+                          })
+                          
+                          const netToPayWorkers = totalWorkerWages - totalTips
+                          
+                          return (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                              <div className="p-3 bg-white/60 dark:bg-gray-900/40 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                                <div className="text-xs text-muted-foreground mb-1">הכנסה כוללת</div>
+                                <div className="text-xl font-bold text-emerald-600">
+                                  {formatCurrency(totalRevenue)}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground">ישיבה + TA + משלוחים</div>
+                              </div>
+                              
+                              <div className="p-3 bg-white/60 dark:bg-gray-900/40 rounded-lg border border-amber-200 dark:border-amber-800">
+                                <div className="text-xs text-muted-foreground mb-1">טיפים כולל</div>
+                                <div className="text-xl font-bold text-amber-600">
+                                  {formatCurrency(totalTips)}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground">לקזז משכר</div>
+                              </div>
+                              
+                              <div className="p-3 bg-white/60 dark:bg-gray-900/40 rounded-lg border border-blue-200 dark:border-blue-800">
+                                <div className="text-xs text-muted-foreground mb-1">שכר עובדים</div>
+                                <div className="text-xl font-bold text-blue-600">
+                                  {formatCurrency(totalWorkerWages)}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground">לפני קיזוז טיפים</div>
+                              </div>
+                              
+                              <div className="p-3 bg-white/60 dark:bg-gray-900/40 rounded-lg border border-purple-200 dark:border-purple-800">
+                                <div className="text-xs text-muted-foreground mb-1">לתשלום נטו</div>
+                                <div className="text-xl font-bold text-purple-600">
+                                  {formatCurrency(netToPayWorkers)}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground">שכר - טיפים</div>
+                              </div>
+                            </div>
+                          )
+                        })()}
+                      </CardContent>
+                    </Card>
+                  )}
                 </TabsContent>
               ))}
             </Tabs>

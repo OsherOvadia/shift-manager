@@ -119,14 +119,27 @@ export default function AvailabilityPage() {
     
     setSelectedSlots((prev) => {
       const next = new Map(prev)
+      
       if (next.has(key)) {
+        // Remove this slot
         next.delete(key)
       } else {
+        // Add the slot
         next.set(key, {
           shiftDate: dateStr,
           shiftType,
           preferenceRank: 1,
         })
+        
+        // Smart logic: If selecting EVENING_CLOSE, remove EVENING (they're mutually exclusive)
+        // If selecting EVENING, remove EVENING_CLOSE (they're mutually exclusive)
+        if (shiftType === 'EVENING_CLOSE') {
+          const eveningKey = `${dateStr}_EVENING`
+          next.delete(eveningKey)
+        } else if (shiftType === 'EVENING') {
+          const eveningCloseKey = `${dateStr}_EVENING_CLOSE`
+          next.delete(eveningCloseKey)
+        }
       }
       return next
     })
