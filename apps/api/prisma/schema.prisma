@@ -241,6 +241,9 @@ model DailyRevenue {
   organizationId String   @map("organization_id")
   date           DateTime @db.Date
   totalRevenue   Float    @map("total_revenue")
+  sittingRevenue Float    @default(0) @map("sitting_revenue")
+  takeawayRevenue Float   @default(0) @map("takeaway_revenue")
+  deliveryRevenue Float   @default(0) @map("delivery_revenue")
   notes          String?
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")

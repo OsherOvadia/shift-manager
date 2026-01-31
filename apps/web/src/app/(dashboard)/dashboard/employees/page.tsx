@@ -328,7 +328,6 @@ export default function EmployeesPage() {
                 </div>
                 {employee.hourlyWage > 0 && (
                   <div className="flex items-center gap-1 text-sm text-muted-foreground mb-3">
-                    <DollarSign className="h-3 w-3" />
                     <span>₪{employee.hourlyWage.toFixed(2)} לשעה</span>
                   </div>
                 )}

@@ -47,6 +47,9 @@ export default function RevenuePage() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }))
   const [selectedDay, setSelectedDay] = useState<number>(0)
   const [revenueInputs, setRevenueInputs] = useState<{ [key: string]: string }>({})
+  const [sittingInputs, setSittingInputs] = useState<{ [key: string]: string }>({})
+  const [takeawayInputs, setTakeawayInputs] = useState<{ [key: string]: string }>({})
+  const [deliveryInputs, setDeliveryInputs] = useState<{ [key: string]: string }>({})
   const [tipsInputs, setTipsInputs] = useState<{ [key: string]: string }>({})
   const [savingRevenue, setSavingRevenue] = useState<string | null>(null)
   const [savingTips, setSavingTips] = useState<string | null>(null)
@@ -95,12 +98,23 @@ export default function RevenuePage() {
   // Initialize revenue inputs from fetched data
   useEffect(() => {
     if (revenueData && Array.isArray(revenueData)) {
-      const newInputs: { [key: string]: string } = {}
+      const newRevenueInputs: { [key: string]: string } = {}
+      const newSittingInputs: { [key: string]: string } = {}
+      const newTakeawayInputs: { [key: string]: string } = {}
+      const newDeliveryInputs: { [key: string]: string } = {}
+      
       revenueData.forEach((r: any) => {
         const dateKey = getDateStr(r.date)
-        newInputs[dateKey] = r.totalRevenue.toString()
+        newRevenueInputs[dateKey] = r.totalRevenue.toString()
+        newSittingInputs[dateKey] = (r.sittingRevenue || 0).toString()
+        newTakeawayInputs[dateKey] = (r.takeawayRevenue || 0).toString()
+        newDeliveryInputs[dateKey] = (r.deliveryRevenue || 0).toString()
       })
-      setRevenueInputs(prev => ({ ...newInputs, ...prev }))
+      
+      setRevenueInputs(prev => ({ ...newRevenueInputs, ...prev }))
+      setSittingInputs(prev => ({ ...newSittingInputs, ...prev }))
+      setTakeawayInputs(prev => ({ ...newTakeawayInputs, ...prev }))
+      setDeliveryInputs(prev => ({ ...newDeliveryInputs, ...prev }))
     }
   }, [revenueData])
 
@@ -172,12 +186,16 @@ export default function RevenuePage() {
 
   const handleSaveRevenue = (date: Date) => {
     const dateKey = formatDateLocal(date)
-    const amount = parseFloat(revenueInputs[dateKey] || '0')
+    const sitting = parseFloat(sittingInputs[dateKey] || '0')
+    const takeaway = parseFloat(takeawayInputs[dateKey] || '0')
+    const delivery = parseFloat(deliveryInputs[dateKey] || '0')
+    const total = sitting + takeaway + delivery
     
-    if (isNaN(amount) || amount < 0) {
+    if (isNaN(sitting) || isNaN(takeaway) || isNaN(delivery) || 
+        sitting < 0 || takeaway < 0 || delivery < 0) {
       toast({
         title: 'שגיאה',
-        description: 'אנא הזן סכום תקין',
+        description: 'אנא הזן סכומים תקינים',
         variant: 'destructive',
       })
       return
@@ -185,8 +203,11 @@ export default function RevenuePage() {
 
     setSavingRevenue(dateKey)
     saveDailyRevenueMutation.mutate({
-      date: dateKey, // Use formatted date to avoid timezone issues
-      totalRevenue: amount,
+      date: dateKey,
+      totalRevenue: total,
+      sittingRevenue: sitting,
+      takeawayRevenue: takeaway,
+      deliveryRevenue: delivery,
     })
   }
 
@@ -230,11 +251,17 @@ export default function RevenuePage() {
   // Calculate totals for summary
   const weeklyTotals = useMemo(() => {
     let totalRevenue = 0
+    let totalSitting = 0
+    let totalTakeaway = 0
+    let totalDelivery = 0
     let totalTips = 0
     let totalShifts = 0
 
     if (revenueData && Array.isArray(revenueData)) {
       totalRevenue = revenueData.reduce((sum: number, r: any) => sum + (r.totalRevenue || 0), 0)
+      totalSitting = revenueData.reduce((sum: number, r: any) => sum + (r.sittingRevenue || 0), 0)
+      totalTakeaway = revenueData.reduce((sum: number, r: any) => sum + (r.takeawayRevenue || 0), 0)
+      totalDelivery = revenueData.reduce((sum: number, r: any) => sum + (r.deliveryRevenue || 0), 0)
     }
 
     if (scheduleData?.shiftAssignments) {
@@ -242,7 +269,7 @@ export default function RevenuePage() {
       totalShifts = scheduleData.shiftAssignments.filter((a: any) => a.status !== 'CANCELLED').length
     }
 
-    return { totalRevenue, totalTips, totalShifts }
+    return { totalRevenue, totalSitting, totalTakeaway, totalDelivery, totalTips, totalShifts }
   }, [revenueData, scheduleData])
 
   const shiftsForSelectedDay = getShiftsForDate(selectedDate)
@@ -297,47 +324,75 @@ export default function RevenuePage() {
         </div>
 
         {/* Weekly Summary Cards */}
-        <StaggerContainer className="grid grid-cols-3 gap-3 sm:gap-4">
-          <StaggerItem>
-            <Card className="bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border-emerald-200 dark:border-emerald-800">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <Receipt className="h-4 w-4 text-emerald-600" />
-                  <span className="text-xs text-emerald-700 dark:text-emerald-400">סה״כ קופה</span>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+          {/* Total Revenue Card */}
+          <Card className="bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border-emerald-200 dark:border-emerald-800">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Receipt className="h-5 w-5 text-emerald-600" />
+                <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">סה״כ הכנסות השבוע</span>
+              </div>
+              <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mb-3">
+                {formatCurrency(weeklyTotals.totalRevenue)}
+              </div>
+              
+              {/* Revenue Breakdown */}
+              <div className="space-y-2 pt-3 border-t border-emerald-200 dark:border-emerald-800">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-1.5 text-emerald-700/80 dark:text-emerald-400/80">
+                    <Utensils className="h-3 w-3" />
+                    ישיבה
+                  </span>
+                  <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                    {formatCurrency(weeklyTotals.totalSitting)}
+                  </span>
                 </div>
-                <div className="text-lg sm:text-xl font-bold text-emerald-700 dark:text-emerald-400">
-                  {formatCurrency(weeklyTotals.totalRevenue)}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-1.5 text-emerald-700/80 dark:text-emerald-400/80">
+                    <Receipt className="h-3 w-3" />
+                    טייק אווי
+                  </span>
+                  <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                    {formatCurrency(weeklyTotals.totalTakeaway)}
+                  </span>
                 </div>
-              </CardContent>
-            </Card>
-          </StaggerItem>
-          <StaggerItem>
-            <Card className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border-amber-200 dark:border-amber-800">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <Coins className="h-4 w-4 text-amber-600" />
-                  <span className="text-xs text-amber-700 dark:text-amber-400">סה״כ טיפים</span>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-1.5 text-emerald-700/80 dark:text-emerald-400/80">
+                    <Clock className="h-3 w-3" />
+                    משלוחים
+                  </span>
+                  <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                    {formatCurrency(weeklyTotals.totalDelivery)}
+                  </span>
                 </div>
-                <div className="text-lg sm:text-xl font-bold text-amber-700 dark:text-amber-400">
-                  {formatCurrency(weeklyTotals.totalTips)}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tips and Shifts Card */}
+          <Card className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Coins className="h-5 w-5 text-amber-600" />
+                <span className="text-sm font-medium text-amber-700 dark:text-amber-400">טיפים ומשמרות</span>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <div className="text-xs text-amber-700/70 dark:text-amber-400/70 mb-1">סה״כ טיפים</div>
+                  <div className="text-xl font-bold text-amber-700 dark:text-amber-400">
+                    {formatCurrency(weeklyTotals.totalTips)}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          </StaggerItem>
-          <StaggerItem>
-            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <Users className="h-4 w-4 text-blue-600" />
-                  <span className="text-xs text-blue-700 dark:text-blue-400">משמרות</span>
+                <div className="pt-3 border-t border-amber-200 dark:border-amber-800">
+                  <div className="text-xs text-amber-700/70 dark:text-amber-400/70 mb-1">סה״כ משמרות</div>
+                  <div className="text-xl font-bold text-amber-700 dark:text-amber-400">
+                    {weeklyTotals.totalShifts}
+                  </div>
                 </div>
-                <div className="text-lg sm:text-xl font-bold text-blue-700 dark:text-blue-400">
-                  {weeklyTotals.totalShifts}
-                </div>
-              </CardContent>
-            </Card>
-          </StaggerItem>
-        </StaggerContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {isLoading ? (
           <Card>
@@ -386,31 +441,82 @@ export default function RevenuePage() {
                   <Card>
                     <CardHeader className="p-4 pb-2">
                       <CardTitle className="text-base flex items-center gap-2">
-                        <DollarSign className="h-5 w-5 text-emerald-500" />
+                        <Receipt className="h-5 w-5 text-emerald-500" />
                         הכנסת קופה - יום {HEBREW_DAYS[date.getDay()]} {format(date, 'd בMMMM', { locale: he })}
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-4 pt-2">
-                      <div className="flex items-end gap-3">
-                        <div className="flex-1 max-w-xs">
-                          <Label className="text-sm text-muted-foreground mb-1 block">סכום הכנסה מהקופה (₪)</Label>
+                    <CardContent className="p-4 pt-2 space-y-4">
+                      {/* Revenue Category Inputs */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium flex items-center gap-1">
+                            <Utensils className="h-3 w-3 text-blue-500" />
+                            ישיבה (₪)
+                          </Label>
                           <Input
                             type="number"
-                            placeholder="הזן סכום..."
-                            value={revenueInputs[formatDateLocal(date)] || ''}
-                            onChange={(e) => setRevenueInputs(prev => ({
+                            placeholder="0"
+                            value={sittingInputs[formatDateLocal(date)] || ''}
+                            onChange={(e) => setSittingInputs(prev => ({
                               ...prev,
                               [formatDateLocal(date)]: e.target.value
                             }))}
-                            className="h-12 text-lg"
+                            className="h-10"
                             min="0"
                           />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium flex items-center gap-1">
+                            <Receipt className="h-3 w-3 text-purple-500" />
+                            טייק אווי (₪)
+                          </Label>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            value={takeawayInputs[formatDateLocal(date)] || ''}
+                            onChange={(e) => setTakeawayInputs(prev => ({
+                              ...prev,
+                              [formatDateLocal(date)]: e.target.value
+                            }))}
+                            className="h-10"
+                            min="0"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium flex items-center gap-1">
+                            <Clock className="h-3 w-3 text-orange-500" />
+                            משלוחים (₪)
+                          </Label>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            value={deliveryInputs[formatDateLocal(date)] || ''}
+                            onChange={(e) => setDeliveryInputs(prev => ({
+                              ...prev,
+                              [formatDateLocal(date)]: e.target.value
+                            }))}
+                            className="h-10"
+                            min="0"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Total and Save */}
+                      <div className="flex items-center justify-between pt-2 border-t">
+                        <div className="text-lg font-bold text-emerald-600">
+                          סה״כ: {formatCurrency(
+                            (parseFloat(sittingInputs[formatDateLocal(date)] || '0') +
+                             parseFloat(takeawayInputs[formatDateLocal(date)] || '0') +
+                             parseFloat(deliveryInputs[formatDateLocal(date)] || '0'))
+                          )}
                         </div>
                         <Button 
                           size="lg"
                           onClick={() => handleSaveRevenue(date)}
                           disabled={savingRevenue === formatDateLocal(date)}
-                          className="h-12 px-6"
+                          className="h-10 px-6"
                         >
                           {savingRevenue === formatDateLocal(date) ? (
                             <motion.div 

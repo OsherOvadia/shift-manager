@@ -9,6 +9,21 @@ export class CreateDailyRevenueDto {
   totalRevenue: number;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  sittingRevenue?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  takeawayRevenue?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  deliveryRevenue?: number;
+
+  @IsOptional()
   @IsString()
   notes?: string;
 }
