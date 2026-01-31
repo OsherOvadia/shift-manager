@@ -40,11 +40,12 @@ export default function ManageSchedulePage() {
   const [selectedShift, setSelectedShift] = useState<{ date: Date; shiftType: string } | null>(null)
   const [selectedWorkers, setSelectedWorkers] = useState<string[]>([])
 
-  // Parse week from URL or use current week
+  // Parse week from URL or use current week  
   const urlWeek = searchParams.get('week')
   const currentWeekStart = urlWeek ? getWeekStartDate(new Date(urlWeek)) : getWeekStartDate(new Date())
   const targetWeekStart = new Date(currentWeekStart)
-  targetWeekStart.setDate(targetWeekStart.getDate() + weekOffset * 7)
+  // Use UTC date arithmetic to avoid timezone issues
+  targetWeekStart.setUTCDate(targetWeekStart.getUTCDate() + weekOffset * 7)
   const weekDates = getWeekDates(targetWeekStart)
 
   // Fetch business settings to get actual weekend days

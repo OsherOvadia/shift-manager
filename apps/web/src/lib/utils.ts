@@ -48,10 +48,11 @@ export function getDayLetter(date: Date | string): string {
 
 export function getWeekStartDate(date: Date = new Date()): Date {
   const d = new Date(date)
-  const day = d.getDay()
-  const diff = d.getDate() - day
-  d.setDate(diff)
-  d.setHours(0, 0, 0, 0)
+  // Use UTC to avoid timezone issues
+  const day = d.getUTCDay()
+  const diff = d.getUTCDate() - day
+  d.setUTCDate(diff)
+  d.setUTCHours(0, 0, 0, 0)
   return d
 }
 
