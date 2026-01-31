@@ -44,14 +44,13 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setAuth: (user, accessToken, refreshToken, rememberMe = true) => {
-        // Also save tokens to cookies as backup
+        console.log('✅ Setting auth:', { user: user.email, rememberMe })
+        
+        // Save tokens to cookies as backup
         if (typeof document !== 'undefined') {
-          const expires = rememberMe 
-            ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString() // 30 days
-            : new Date(Date.now() + 24 * 60 * 60 * 1000).toUTCString(); // 1 day
-          
-          document.cookie = `refreshToken=${refreshToken}; expires=${expires}; path=/; SameSite=Strict`;
-          document.cookie = `rememberMe=${rememberMe}; expires=${expires}; path=/; SameSite=Strict`;
+          const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString() // 30 days
+          document.cookie = `refreshToken=${refreshToken}; expires=${expires}; path=/; SameSite=Lax; Secure`
+          document.cookie = `rememberMe=true; expires=${expires}; path=/; SameSite=Lax; Secure`
         }
         
         set({
@@ -59,20 +58,23 @@ export const useAuthStore = create<AuthState>()(
           accessToken,
           refreshToken,
           isAuthenticated: true,
-          rememberMe,
+          rememberMe: true, // Always persist
         })
       },
 
       logout: () => {
+        console.log('🚪 Logging out')
         const { refreshToken } = get()
         if (refreshToken) {
           api.post('/auth/logout', { refreshToken }).catch(() => {})
         }
         
-        // Clear cookies
+        // Clear everything
         if (typeof document !== 'undefined') {
-          document.cookie = 'refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-          document.cookie = 'rememberMe=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+          localStorage.clear()
+          sessionStorage.clear()
+          document.cookie = 'refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+          document.cookie = 'rememberMe=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
         }
         
         set({
@@ -80,7 +82,7 @@ export const useAuthStore = create<AuthState>()(
           accessToken: null,
           refreshToken: null,
           isAuthenticated: false,
-          rememberMe: true,
+          rememberMe: false,
         })
       },
 
@@ -91,74 +93,44 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      // Custom storage that uses localStorage for "Remember Me" or sessionStorage for current session only
+      // Always use localStorage for persistence
       storage: {
         getItem: (name) => {
-          // Try localStorage first
-          const localData = localStorage.getItem(name)
-          if (localData) {
-            try {
-              const parsed = JSON.parse(localData)
-              // Check if rememberMe is true, if so use it
-              if (parsed.state?.rememberMe === true) {
-                return localData
-              }
-            } catch {}
+          try {
+            // Always read from localStorage
+            return localStorage.getItem(name)
+          } catch (error) {
+            console.error('Failed to get auth from storage:', error)
+            return null
           }
-          
-          // Then try sessionStorage
-          const sessionData = sessionStorage.getItem(name)
-          if (sessionData) return sessionData
-          
-          // Finally, try to restore from cookies as fallback
-          if (typeof document !== 'undefined') {
-            const cookies = document.cookie.split(';').reduce((acc, cookie) => {
-              const [key, value] = cookie.trim().split('=')
-              acc[key] = value
-              return acc
-            }, {} as Record<string, string>)
-            
-            if (cookies.refreshToken && cookies.rememberMe === 'true') {
-              // Reconstruct basic auth state from cookies
-              return JSON.stringify({
-                state: {
-                  refreshToken: cookies.refreshToken,
-                  rememberMe: true,
-                  isAuthenticated: true,
-                },
-                version: 0,
-              })
-            }
-          }
-          
-          return null
         },
         setItem: (name, value) => {
           try {
-            const parsedValue = JSON.parse(value)
-            const rememberMe = parsedValue.state?.rememberMe ?? true // Default to true
-            
-            if (rememberMe) {
-              // Save to localStorage (persists across browser sessions)
-              localStorage.setItem(name, value)
-              sessionStorage.removeItem(name)
-            } else {
-              // Save to sessionStorage (cleared when browser closes)
-              sessionStorage.setItem(name, value)
-              localStorage.removeItem(name)
-            }
-          } catch {
-            // Fallback to localStorage
+            // Always save to localStorage
             localStorage.setItem(name, value)
+          } catch (error) {
+            console.error('Failed to save auth to storage:', error)
           }
         },
         removeItem: (name) => {
-          localStorage.removeItem(name)
-          sessionStorage.removeItem(name)
+          try {
+            localStorage.removeItem(name)
+            sessionStorage.removeItem(name)
+            // Clear cookies
+            if (typeof document !== 'undefined') {
+              document.cookie = 'refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+              document.cookie = 'rememberMe=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+            }
+          } catch (error) {
+            console.error('Failed to remove auth from storage:', error)
+          }
         },
       },
       onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true)
+        console.log('🔄 Hydrating auth state:', state ? 'has state' : 'no state')
+        if (state) {
+          state.setHasHydrated(true)
+        }
       },
     }
   )

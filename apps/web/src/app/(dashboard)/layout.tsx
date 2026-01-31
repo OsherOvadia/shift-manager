@@ -55,21 +55,44 @@ export default function DashboardLayout({
   const { user, isAuthenticated, logout, _hasHydrated } = useAuthStore()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
 
   // Wait for client-side mount
   useEffect(() => {
     setMounted(true)
+    
+    // Force check localStorage on mount
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('auth-storage')
+      console.log('💾 LocalStorage check:', stored ? 'has data' : 'empty')
+    }
   }, [])
 
   useEffect(() => {
-    // Only check auth after both mounted AND hydration is complete
-    if (mounted && _hasHydrated && !isAuthenticated) {
-      router.push('/login')
+    console.log('🔐 Auth check:', { mounted, _hasHydrated, isAuthenticated, hasUser: !!user })
+    
+    // Wait for both mount and hydration
+    if (!mounted || !_hasHydrated) {
+      return
     }
+    
+    // Give it a moment to fully hydrate before checking
+    const timer = setTimeout(() => {
+      setAuthChecked(true)
+      
+      if (!isAuthenticated) {
+        console.log('❌ Not authenticated after hydration, redirecting to login')
+        router.push('/login')
+      } else {
+        console.log('✅ Authenticated, staying on page')
+      }
+    }, 100) // Small delay to ensure state is fully restored
+    
+    return () => clearTimeout(timer)
   }, [mounted, _hasHydrated, isAuthenticated, router])
 
-  // Show loading while waiting for hydration (don't show null immediately)
-  if (!mounted || !_hasHydrated) {
+  // Show loading while waiting for hydration and auth check
+  if (!mounted || !_hasHydrated || !authChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -77,7 +100,7 @@ export default function DashboardLayout({
     )
   }
 
-  // After hydration, if not authenticated, show nothing (will redirect)
+  // After all checks, if not authenticated, show nothing (already redirecting)
   if (!isAuthenticated || !user) {
     return null
   }
