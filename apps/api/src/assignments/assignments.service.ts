@@ -44,11 +44,14 @@ export class AssignmentsService {
       throw new NotFoundException('תבנית המשמרת לא נמצאה');
     }
 
+    // Parse date without timezone conversion
+    const shiftDate = this.parseLocalDate(createDto.shiftDate);
+
     // Check for conflicts
     const conflict = await this.checkConflict(
       createDto.userId,
       createDto.scheduleId,
-      new Date(createDto.shiftDate),
+      shiftDate,
       createDto.shiftTemplateId,
     );
 
@@ -61,7 +64,7 @@ export class AssignmentsService {
       where: {
         scheduleId: createDto.scheduleId,
         shiftTemplateId: createDto.shiftTemplateId,
-        shiftDate: new Date(createDto.shiftDate),
+        shiftDate: shiftDate,
         status: { not: 'CANCELLED' },
       },
     });
@@ -75,7 +78,7 @@ export class AssignmentsService {
         scheduleId: createDto.scheduleId,
         userId: createDto.userId,
         shiftTemplateId: createDto.shiftTemplateId,
-        shiftDate: new Date(createDto.shiftDate),
+        shiftDate: shiftDate,
         status: 'PENDING',
       },
       include: {
@@ -261,5 +264,20 @@ export class AssignmentsService {
     });
 
     return !!existing;
+  }
+
+  /**
+   * Parse date string as local date without timezone conversion
+   * Handles both YYYY-MM-DD and ISO format strings
+   */
+  private parseLocalDate(dateStr: string): Date {
+    // If it's already an ISO string with time, extract just the date part
+    const datePart = dateStr.split('T')[0];
+    
+    // Parse as local date: YYYY-MM-DD
+    const [year, month, day] = datePart.split('-').map(Number);
+    
+    // Create date in local timezone (month is 0-indexed in JavaScript)
+    return new Date(year, month - 1, day);
   }
 }

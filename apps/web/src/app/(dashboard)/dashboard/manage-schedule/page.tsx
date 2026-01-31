@@ -227,13 +227,16 @@ export default function ManageSchedulePage() {
     const template = getShiftTemplateByType(selectedShift.shiftType)
     if (!template) return
 
+    // Format date as YYYY-MM-DD to avoid timezone issues
+    const dateStr = formatDateLocal(selectedShift.date)
+
     // Add all selected workers to the shift
     for (const userId of selectedWorkers) {
       await createAssignmentMutation.mutateAsync({
         scheduleId: currentSchedule.id,
         userId,
         shiftTemplateId: template.id,
-        shiftDate: selectedShift.date.toISOString(),
+        shiftDate: dateStr, // Use local date string instead of ISO
       })
     }
 
@@ -562,8 +565,7 @@ export default function ManageSchedulePage() {
                               <Checkbox
                                 checked={selectedWorkers.includes(emp.id)}
                                 disabled={isAssigned}
-                                onCheckedChange={() => toggleWorker(emp.id)}
-                                className="border-2 border-green-700 data-[state=checked]:bg-green-600"
+                                className="border-2 border-green-700 data-[state=checked]:bg-green-600 pointer-events-none"
                               />
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
@@ -614,7 +616,7 @@ export default function ManageSchedulePage() {
                               <Checkbox
                                 checked={selectedWorkers.includes(emp.id)}
                                 disabled={isAssigned}
-                                onCheckedChange={() => toggleWorker(emp.id)}
+                                className="pointer-events-none"
                               />
                               <div className="flex-1">
                                 <span className="font-medium">
