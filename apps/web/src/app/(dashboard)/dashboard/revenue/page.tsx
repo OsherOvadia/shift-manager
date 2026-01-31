@@ -464,6 +464,9 @@ export default function RevenuePage() {
                                   </div>
                                 </div>
 
+                                {/* Shift Revenue & Tips Inputs */}
+                                <div className="space-y-3">
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                     {/* Sitting Revenue */}
                                     <div className="space-y-2">
                                       <Label className="text-sm font-medium flex items-center gap-1 text-blue-600">
