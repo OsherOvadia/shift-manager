@@ -229,11 +229,12 @@ export class ReportsService {
     // Total summary
     let totalHours = 0;
     let totalCost = 0;
-    let totalTips = 0;
+    // Don't calculate totalTips from employeeCosts - it would count tips multiple times per shift
+    // let totalTips = 0;
     for (const [, record] of employeeCosts) {
       totalHours += record.totalHours;
       totalCost += record.totalCost;
-      totalTips += record.totalTips;
+      // totalTips += record.totalTips; // REMOVED: This causes double counting
     }
 
     // Calculate total revenue from shift assignments (sitting + takeaway + delivery)
@@ -263,18 +264,14 @@ export class ReportsService {
       }
     }
     
-    // Calculate totals from unique shifts
+    // Calculate totals from unique shifts (correct way - count each shift once!)
     let totalRevenue = 0;
-    let totalRevenueFromShifts = 0;
-    let totalTipsFromShifts = 0;
+    let totalTips = 0;
     
     for (const [, shiftRevenue] of revenueByShift) {
-      totalRevenueFromShifts += shiftRevenue.sitting + shiftRevenue.takeaway + shiftRevenue.delivery;
-      totalTipsFromShifts += shiftRevenue.tips;
+      totalRevenue += shiftRevenue.sitting + shiftRevenue.takeaway + shiftRevenue.delivery;
+      totalTips += shiftRevenue.tips;
     }
-    
-    totalRevenue = totalRevenueFromShifts;
-    totalTips = totalTipsFromShifts; // Use actual tips from shifts, not just employee earnings
     
     // Calculate revenue by day
     const revenueByDay = new Map<string, number>();

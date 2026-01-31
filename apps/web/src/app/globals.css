@@ -10,42 +10,42 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 220 90% 56%; /* Brighter, more vibrant blue */
+    --primary: 220 90% 56%; /* Vibrant blue for better contrast */
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 13% 91%; /* Softer gray */
+    --secondary: 220 14% 93%; /* Lighter gray for better readability */
     --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 220 13% 95%; /* Lighter muted */
-    --muted-foreground: 220 9% 46%;
+    --muted: 220 13% 96%; /* Very light muted */
+    --muted-foreground: 220 9% 40%; /* Darker for better contrast */
     --accent: 37 91% 55%; /* Warm orange accent */
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
+    --border: 220 13% 88%; /* Slightly darker border */
+    --input: 220 13% 94%; /* Lighter input background */
     --ring: 220 90% 56%;
-    --radius: 0.5rem;
+    --radius: 0.75rem; /* Increased for modern look */
   }
 
   .dark {
-    --background: 222 47% 11%; /* Darker background for better contrast */
+    --background: 222 47% 11%; /* Dark background for contrast */
     --foreground: 210 40% 98%;
     --card: 222 47% 14%; /* Slightly lighter than background */
     --card-foreground: 210 40% 98%;
     --popover: 222 47% 14%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217 91% 60%; /* Brighter primary in dark mode */
+    --primary: 217 91% 65%; /* Brighter primary in dark mode */
     --primary-foreground: 222 47% 11%;
-    --secondary: 217 32% 18%;
+    --secondary: 217 32% 20%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217 32% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 37 91% 55%; /* Same warm accent */
+    --muted-foreground: 215 20% 70%; /* Lighter for better contrast */
+    --accent: 37 91% 60%; /* Brighter accent in dark */
     --accent-foreground: 222 47% 11%;
-    --destructive: 0 63% 31%;
+    --destructive: 0 63% 40%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217 32% 20%;
-    --input: 217 32% 20%;
-    --ring: 217 91% 60%;
+    --border: 217 32% 22%; /* Lighter border */
+    --input: 217 32% 18%;
+    --ring: 217 91% 65%;
   }
 }
 
@@ -186,20 +186,46 @@ html {
   50% { box-shadow: 0 0 20px 5px rgba(59, 130, 246, 0.2); }
 }
 
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
 .animate-fade-in {
-  animation: fade-in 0.3s ease-out;
+  animation: fade-in 0.4s ease-out;
 }
 
 .animate-slide-in {
-  animation: slide-in 0.3s ease-out;
+  animation: slide-in 0.4s ease-out;
 }
 
 .animate-scale-in {
-  animation: scale-in 0.3s ease-out;
+  animation: scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Smooth transitions for interactive elements */
+button, a, input, select, textarea {
+  transition: all 0.2s ease-in-out;
+}
+
+button:active, a:active {
+  transform: scale(0.98);
+}
+
+/* Loading shimmer effect */
+.loading-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 0%,
+    hsl(var(--muted-foreground) / 0.1) 50%,
+    hsl(var(--muted)) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
 }
 
 /* Safe area for mobile bottom navigation */
@@ -226,15 +252,15 @@ html {
 
 /* Mobile optimizations */
 @media (max-width: 640px) {
-  /* Larger touch targets */
-  button, a, [role="button"] {
+  /* Larger touch targets for better mobile UX */
+  button, a, [role="button"], input[type="checkbox"], input[type="radio"] {
     min-height: 44px;
     min-width: 44px;
   }
   
   /* Better spacing for mobile */
   .card {
-    border-radius: 0.75rem;
+    border-radius: 1rem;
   }
   
   /* Prevent horizontal scroll */
@@ -250,21 +276,46 @@ html {
   
   /* Compact padding on mobile */
   .mobile-compact {
-    padding: 0.75rem !important;
+    padding: 1rem !important;
   }
   
   /* Stack flex items on mobile */
   .mobile-stack {
     flex-direction: column !important;
-    gap: 0.75rem !important;
+    gap: 1rem !important;
   }
   
-  /* Full width inputs on mobile */
+  /* Full width inputs on mobile with better touch targets */
   input[type="text"],
   input[type="email"],
   input[type="password"],
-  input[type="number"] {
+  input[type="number"],
+  textarea,
+  select {
     font-size: 16px; /* Prevents zoom on iOS */
+    min-height: 44px;
+    padding: 0.75rem;
+  }
+  
+  /* Better button sizing */
+  button:not(.btn-icon) {
+    padding: 0.75rem 1.25rem;
+    font-size: 1rem;
+  }
+  
+  /* Improved card spacing */
+  [class*="card-"] {
+    padding: 1rem;
+  }
+  
+  /* Better text hierarchy */
+  h1 { font-size: 1.75rem; }
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.25rem; }
+  
+  /* Smoother scrolling on mobile */
+  * {
+    -webkit-overflow-scrolling: touch;
   }
 }
 

@@ -117,10 +117,11 @@ export default function RevenuePage() {
         // Only store first occurrence (all workers in shift have same values)
         if (!shiftMap.has(shiftKey)) {
           shiftMap.set(shiftKey, a)
-          if (a.sittingTips) newSitting[shiftKey] = a.sittingTips.toString()
-          if (a.takeawayTips) newTakeaway[shiftKey] = a.takeawayTips.toString()
-          if (a.deliveryTips) newDelivery[shiftKey] = a.deliveryTips.toString()
-          if (a.tipsEarned) newTips[shiftKey] = a.tipsEarned.toString()
+          // Always set values, even when 0, to prevent form reset
+          newSitting[shiftKey] = (a.sittingTips || 0).toString()
+          newTakeaway[shiftKey] = (a.takeawayTips || 0).toString()
+          newDelivery[shiftKey] = (a.deliveryTips || 0).toString()
+          newTips[shiftKey] = (a.tipsEarned || 0).toString()
         }
       })
       
@@ -434,7 +435,7 @@ export default function RevenuePage() {
           <>
             {/* Day Selector Tabs */}
             <Tabs value={selectedDay.toString()} onValueChange={(v) => setSelectedDay(parseInt(v))} className="w-full">
-              <TabsList className="w-full grid grid-cols-7 h-auto p-1">
+              <TabsList className="w-full grid grid-cols-7 h-auto p-1 gap-1">
                 {weekDates.map((date, index) => {
                   const dayShifts = getShiftsForDate(date)
                   const dayRevenue = getRevenueForDate(date)
@@ -444,14 +445,14 @@ export default function RevenuePage() {
                     <TabsTrigger
                       key={index}
                       value={index.toString()}
-                      className="flex flex-col gap-0.5 py-2 px-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                      className="flex flex-col gap-1 py-3 px-1 min-h-[60px] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg"
                     >
-                      <span className="text-[10px] sm:text-xs font-medium">{HEBREW_DAYS[date.getDay()]}</span>
-                      <span className="text-[10px] text-muted-foreground data-[state=active]:text-primary-foreground/70">
+                      <span className="text-xs sm:text-sm font-medium">{HEBREW_DAYS[date.getDay()]}</span>
+                      <span className="text-[11px] text-muted-foreground data-[state=active]:text-primary-foreground/70">
                         {format(date, 'd/M')}
                       </span>
                       {hasData && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 data-[state=active]:bg-emerald-300" />
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 data-[state=active]:bg-emerald-300" />
                       )}
                     </TabsTrigger>
                   )
@@ -462,13 +463,13 @@ export default function RevenuePage() {
                 <TabsContent key={index} value={index.toString()} className="mt-4 space-y-4">
                   {/* Shifts Tips Entry */}
                   <Card>
-                    <CardHeader className="p-4 pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Coins className="h-5 w-5 text-amber-500" />
+                    <CardHeader className="p-4 sm:p-6 pb-3">
+                      <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
+                        <Coins className="h-6 w-6 text-amber-500" />
                         טיפים למשמרות ({shiftsForSelectedDay.length})
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-4 pt-2">
+                    <CardContent className="p-4 sm:p-6 pt-0">
                       {shiftsForSelectedDay.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
                           <CalendarDays className="h-12 w-12 mx-auto mb-3 opacity-30" />
@@ -476,41 +477,42 @@ export default function RevenuePage() {
                           <p className="text-sm">שבץ עובדים למשמרות כדי להזין טיפים</p>
                         </div>
                       ) : (
-                        <div className="space-y-4">
+                        <div className="space-y-4 sm:space-y-6">
                           {shiftsForSelectedDay.map((shiftGroup: any) => {
                             const shiftKey = getShiftKey(date, shiftGroup.shiftType)
                             
                             return (
                               <div 
                                 key={shiftGroup.shiftType} 
-                                className="p-4 bg-muted/50 rounded-lg border"
+                                className="p-4 sm:p-6 bg-muted/50 rounded-xl border-2"
                               >
                                 {/* Shift Header */}
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="flex items-center gap-3">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                                  <div className="flex items-center gap-3 flex-wrap">
                                     <Badge 
-                                      className={SHIFT_TYPES[shiftGroup.displayType]?.color || SHIFT_TYPES[shiftGroup.shiftType]?.color || 'bg-gray-100'}
+                                      className={`text-sm py-1.5 px-3 ${SHIFT_TYPES[shiftGroup.displayType]?.color || SHIFT_TYPES[shiftGroup.shiftType]?.color || 'bg-gray-100'}`}
                                     >
                                       {SHIFT_TYPES[shiftGroup.displayType]?.label || SHIFT_TYPES[shiftGroup.shiftType]?.label || shiftGroup.shiftTemplate.name}
                                     </Badge>
-                                    <span className="text-sm text-muted-foreground">
-                                      <Clock className="h-3 w-3 inline ml-1" />
+                                    <span className="text-sm sm:text-base text-muted-foreground flex items-center gap-1">
+                                      <Clock className="h-4 w-4" />
                                       {shiftGroup.shiftTemplate.startTime} - {shiftGroup.shiftTemplate.endTime}
                                     </span>
                                   </div>
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Users className="h-3 w-3" />
-                                    {shiftGroup.workers.length} עובדים: {shiftGroup.workers.map((w: any) => w.firstName).join(', ')}
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Users className="h-4 w-4" />
+                                    <span className="font-medium">{shiftGroup.workers.length} עובדים:</span>
+                                    <span className="text-xs sm:text-sm">{shiftGroup.workers.map((w: any) => w.firstName).join(', ')}</span>
                                   </div>
                                 </div>
 
                                 {/* Shift Revenue & Tips Inputs */}
-                                <div className="space-y-3">
-                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className="space-y-4">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                     {/* Sitting Revenue */}
                                     <div className="space-y-2">
-                                      <Label className="text-sm font-medium flex items-center gap-1 text-blue-600">
-                                        <Utensils className="h-3 w-3" />
+                                      <Label className="text-base font-semibold flex items-center gap-2 text-blue-600">
+                                        <Utensils className="h-5 w-5" />
                                         ישיבה (₪)
                                       </Label>
                                       <Input
@@ -521,15 +523,15 @@ export default function RevenuePage() {
                                           ...prev,
                                           [shiftKey]: e.target.value
                                         }))}
-                                        className="h-10"
+                                        className="h-12 text-lg"
                                         min="0"
                                       />
                                     </div>
                                     
                                     {/* Takeaway Revenue */}
                                     <div className="space-y-2">
-                                      <Label className="text-sm font-medium flex items-center gap-1 text-purple-600">
-                                        <Receipt className="h-3 w-3" />
+                                      <Label className="text-base font-semibold flex items-center gap-2 text-purple-600">
+                                        <Receipt className="h-5 w-5" />
                                         TA (₪)
                                       </Label>
                                       <Input
@@ -540,15 +542,15 @@ export default function RevenuePage() {
                                           ...prev,
                                           [shiftKey]: e.target.value
                                         }))}
-                                        className="h-10"
+                                        className="h-12 text-lg"
                                         min="0"
                                       />
                                     </div>
                                     
                                     {/* Delivery Revenue */}
                                     <div className="space-y-2">
-                                      <Label className="text-sm font-medium flex items-center gap-1 text-orange-600">
-                                        <Clock className="h-3 w-3" />
+                                      <Label className="text-base font-semibold flex items-center gap-2 text-orange-600">
+                                        <Clock className="h-5 w-5" />
                                         משלוחים (₪)
                                       </Label>
                                       <Input
@@ -559,15 +561,15 @@ export default function RevenuePage() {
                                           ...prev,
                                           [shiftKey]: e.target.value
                                         }))}
-                                        className="h-10"
+                                        className="h-12 text-lg"
                                         min="0"
                                       />
                                     </div>
                                     
                                     {/* Tips */}
                                     <div className="space-y-2">
-                                      <Label className="text-sm font-medium flex items-center gap-1 text-amber-600">
-                                        <Coins className="h-3 w-3" />
+                                      <Label className="text-base font-semibold flex items-center gap-2 text-amber-600">
+                                        <Coins className="h-5 w-5" />
                                         טיפ (₪)
                                       </Label>
                                       <Input
@@ -578,15 +580,15 @@ export default function RevenuePage() {
                                           ...prev,
                                           [shiftKey]: e.target.value
                                         }))}
-                                        className="h-10"
+                                        className="h-12 text-lg"
                                         min="0"
                                       />
                                     </div>
                                   </div>
                                   
                                   {/* Total and Save */}
-                                  <div className="flex items-center justify-between pt-3 border-t">
-                                    <div className="text-lg font-bold text-emerald-600">
+                                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t-2">
+                                    <div className="text-xl sm:text-2xl font-bold text-emerald-600 py-2">
                                       סה״כ: {formatCurrency(
                                         (parseFloat(sittingRevenue[shiftKey] || '0') +
                                          parseFloat(takeawayRevenue[shiftKey] || '0') +
@@ -598,17 +600,17 @@ export default function RevenuePage() {
                                       size="lg"
                                       onClick={() => handleSaveShiftData(date, shiftGroup.shiftType, shiftGroup.assignmentIds)}
                                       disabled={savingData === shiftKey}
-                                      className="h-10 px-6"
+                                      className="h-14 px-8 text-lg font-semibold shadow-lg hover:shadow-xl transition-all"
                                     >
                                       {savingData === shiftKey ? (
                                         <motion.div 
-                                          className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                                          className="w-6 h-6 border-2 border-white border-t-transparent rounded-full"
                                           animate={{ rotate: 360 }}
                                           transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                                         />
                                       ) : (
                                         <>
-                                          <Save className="h-4 w-4 ml-2" />
+                                          <Save className="h-5 w-5 ml-2" />
                                           שמור
                                         </>
                                       )}
@@ -625,14 +627,14 @@ export default function RevenuePage() {
 
                   {/* Daily Financial Summary */}
                   {shiftsForSelectedDay.length > 0 && (
-                    <Card className="bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-emerald-950/20 dark:to-blue-950/20 border-emerald-200 dark:border-emerald-800">
-                      <CardHeader className="p-4 pb-2">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <DollarSign className="h-5 w-5 text-emerald-600" />
+                    <Card className="bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-emerald-950/20 dark:to-blue-950/20 border-2 border-emerald-200 dark:border-emerald-800 shadow-lg">
+                      <CardHeader className="p-4 sm:p-6 pb-3">
+                        <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
+                          <DollarSign className="h-6 w-6 text-emerald-600" />
                           סיכום יומי - {HEBREW_DAYS[date.getDay()]} {format(date, 'd/M')}
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="p-4 pt-2">
+                      <CardContent className="p-4 sm:p-6 pt-0">
                         {(() => {
                           // Calculate daily totals
                           let totalRevenue = 0
@@ -672,37 +674,37 @@ export default function RevenuePage() {
                           const netToPayWorkers = totalWorkerWages - totalTips
                           
                           return (
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                              <div className="p-3 bg-white/60 dark:bg-gray-900/40 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                                <div className="text-xs text-muted-foreground mb-1">הכנסה כוללת</div>
-                                <div className="text-xl font-bold text-emerald-600">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                              <div className="p-4 sm:p-5 bg-white/80 dark:bg-gray-900/60 rounded-xl border-2 border-emerald-200 dark:border-emerald-800 shadow-md">
+                                <div className="text-sm font-medium text-muted-foreground mb-2">הכנסה כוללת</div>
+                                <div className="text-2xl sm:text-3xl font-bold text-emerald-600 mb-1">
                                   {formatCurrency(totalRevenue)}
                                 </div>
-                                <div className="text-[10px] text-muted-foreground">ישיבה + TA + משלוחים</div>
+                                <div className="text-xs text-muted-foreground">ישיבה + TA + משלוחים</div>
                               </div>
                               
-                              <div className="p-3 bg-white/60 dark:bg-gray-900/40 rounded-lg border border-amber-200 dark:border-amber-800">
-                                <div className="text-xs text-muted-foreground mb-1">טיפים כולל</div>
-                                <div className="text-xl font-bold text-amber-600">
+                              <div className="p-4 sm:p-5 bg-white/80 dark:bg-gray-900/60 rounded-xl border-2 border-amber-200 dark:border-amber-800 shadow-md">
+                                <div className="text-sm font-medium text-muted-foreground mb-2">טיפים כולל</div>
+                                <div className="text-2xl sm:text-3xl font-bold text-amber-600 mb-1">
                                   {formatCurrency(totalTips)}
                                 </div>
-                                <div className="text-[10px] text-muted-foreground">לקזז משכר</div>
+                                <div className="text-xs text-muted-foreground">לקזז משכר</div>
                               </div>
                               
-                              <div className="p-3 bg-white/60 dark:bg-gray-900/40 rounded-lg border border-blue-200 dark:border-blue-800">
-                                <div className="text-xs text-muted-foreground mb-1">שכר עובדים</div>
-                                <div className="text-xl font-bold text-blue-600">
+                              <div className="p-4 sm:p-5 bg-white/80 dark:bg-gray-900/60 rounded-xl border-2 border-blue-200 dark:border-blue-800 shadow-md">
+                                <div className="text-sm font-medium text-muted-foreground mb-2">שכר עובדים</div>
+                                <div className="text-2xl sm:text-3xl font-bold text-blue-600 mb-1">
                                   {formatCurrency(totalWorkerWages)}
                                 </div>
-                                <div className="text-[10px] text-muted-foreground">לפני קיזוז טיפים</div>
+                                <div className="text-xs text-muted-foreground">לפני קיזוז טיפים</div>
                               </div>
                               
-                              <div className="p-3 bg-white/60 dark:bg-gray-900/40 rounded-lg border border-purple-200 dark:border-purple-800">
-                                <div className="text-xs text-muted-foreground mb-1">לתשלום נטו</div>
-                                <div className="text-xl font-bold text-purple-600">
+                              <div className="p-4 sm:p-5 bg-white/80 dark:bg-gray-900/60 rounded-xl border-2 border-purple-200 dark:border-purple-800 shadow-md">
+                                <div className="text-sm font-medium text-muted-foreground mb-2">לתשלום נטו</div>
+                                <div className="text-2xl sm:text-3xl font-bold text-purple-600 mb-1">
                                   {formatCurrency(netToPayWorkers)}
                                 </div>
-                                <div className="text-[10px] text-muted-foreground">שכר - טיפים</div>
+                                <div className="text-xs text-muted-foreground">שכר - טיפים</div>
                               </div>
                             </div>
                           )

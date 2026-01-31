@@ -166,7 +166,7 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6">
+        <div className="flex h-16 items-center justify-between px-4 sm:px-6">
           {/* Right side - Logo and menu */}
           <div className="flex items-center gap-2 sm:gap-4">
             <Link href="/dashboard" className="flex items-center gap-2">
@@ -193,10 +193,10 @@ export default function DashboardLayout({
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden h-8 w-8"
+              className="md:hidden h-10 w-10"
               onClick={() => setSidebarOpen(true)}
             >
-              <Menu className="h-5 w-5" />
+              <Menu className="h-6 w-6" />
             </Button>
 
             {/* User Menu - Desktop */}
@@ -240,16 +240,21 @@ export default function DashboardLayout({
         {/* Sidebar - Right side for RTL */}
         <aside
           className={cn(
-            'fixed md:sticky top-0 md:top-16 right-0 z-50 md:z-auto h-screen md:h-[calc(100vh-4rem)] w-64 flex-col border-s bg-background transition-transform duration-300 ease-in-out',
+            'fixed md:sticky top-0 md:top-16 right-0 z-50 md:z-auto h-screen md:h-[calc(100vh-4rem)] w-72 sm:w-80 md:w-64 flex-col border-l bg-background shadow-2xl md:shadow-none transition-transform duration-300 ease-in-out',
             sidebarOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0',
             'md:flex'
           )}
         >
           {/* Mobile header */}
-          <div className="flex items-center justify-between p-4 border-b md:hidden">
-            <span className="font-bold text-lg">תפריט</span>
-            <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)}>
-              <X className="h-5 w-5" />
+          <div className="flex items-center justify-between p-4 border-b md:hidden bg-primary/5">
+            <span className="font-bold text-xl">תפריט</span>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-10 w-10" 
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X className="h-6 w-6" />
             </Button>
           </div>
           
@@ -268,7 +273,7 @@ export default function DashboardLayout({
             </div>
           </div>
 
-          <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
             {filteredNavigation.map((item) => {
               const isActive = pathname === item.href
               return (
@@ -278,13 +283,13 @@ export default function DashboardLayout({
                   prefetch={true}
                   onClick={() => setSidebarOpen(false)}
                   className={cn(
-                    'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                    'flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium transition-all active:scale-95',
                     isActive
                       ? `${item.color} text-white shadow-lg`
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted'
                   )}
                 >
-                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  <item.icon className="h-6 w-6 flex-shrink-0" />
                   <span className="truncate">{item.name}</span>
                 </Link>
               )
@@ -292,13 +297,14 @@ export default function DashboardLayout({
           </nav>
 
           {/* Mobile logout button */}
-          <div className="p-3 border-t md:hidden">
+          <div className="p-4 border-t md:hidden">
             <Button 
               variant="outline" 
-              className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
+              size="lg"
+              className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 h-12"
               onClick={handleLogout}
             >
-              <LogOut className="ml-2 h-4 w-4" />
+              <LogOut className="ml-2 h-5 w-5" />
               התנתק
             </Button>
           </div>
@@ -312,14 +318,14 @@ export default function DashboardLayout({
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 min-w-0 p-3 sm:p-4 md:p-6 pb-24 md:pb-6">
+        <main className="flex-1 min-w-0 p-4 sm:p-6 md:p-6 pb-28 md:pb-6">
           {children}
         </main>
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 border-t bg-background/95 backdrop-blur z-40 safe-area-pb">
-        <div className="grid grid-cols-5 gap-1 py-2 px-2">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 border-t bg-background/98 backdrop-blur-lg z-40 safe-area-pb shadow-[0_-2px_10px_rgba(0,0,0,0.1)] dark:shadow-[0_-2px_10px_rgba(0,0,0,0.3)]">
+        <div className="grid grid-cols-5 gap-0.5 py-2 px-1">
           {mobileNavigation.map((item) => {
             const isActive = pathname === item.href
             return (
@@ -328,15 +334,15 @@ export default function DashboardLayout({
                 href={item.href}
                 prefetch={true}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[10px] transition-colors',
+                  'flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-xl text-[11px] transition-all active:scale-95',
                   isActive 
                     ? `${item.textColor} bg-current/10` 
                     : 'text-muted-foreground active:bg-muted'
                 )}
               >
                 <div className={cn(
-                  'p-1.5 rounded-lg transition-colors',
-                  isActive && `${item.color} text-white`
+                  'p-2 rounded-lg transition-all',
+                  isActive && `${item.color} text-white shadow-md`
                 )}>
                   <item.icon className="h-5 w-5" />
                 </div>

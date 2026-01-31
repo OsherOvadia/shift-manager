@@ -263,17 +263,17 @@ export default function ReportsPage() {
         ) : report ? (
           <div className="space-y-4">
             {/* Summary Cards */}
-            <StaggerContainer className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+            <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
               <StaggerItem>
-                <Card>
-                  <CardHeader className="p-3 pb-1">
+                <Card className="shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader className="p-4 sm:p-5 pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-xs sm:text-sm font-medium">סה״כ הכנסות</CardTitle>
-                      <TrendingUp className="h-4 w-4 text-emerald-500" />
+                      <CardTitle className="text-sm sm:text-base font-semibold">סה״כ הכנסות</CardTitle>
+                      <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-500" />
                     </div>
                   </CardHeader>
-                  <CardContent className="p-3 pt-0">
-                    <div className="text-lg sm:text-xl font-bold text-emerald-600">
+                  <CardContent className="p-4 sm:p-5 pt-0">
+                    <div className="text-2xl sm:text-3xl font-bold text-emerald-600">
                       {formatCurrency(report.summary.totalRevenue || 0)}
                     </div>
                   </CardContent>
@@ -281,19 +281,19 @@ export default function ReportsPage() {
               </StaggerItem>
 
               <StaggerItem>
-                <Card>
-                  <CardHeader className="p-3 pb-1">
+                <Card className="shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader className="p-4 sm:p-5 pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-xs sm:text-sm font-medium">עלות שכר</CardTitle>
-                      <DollarSign className="h-4 w-4 text-red-500" />
+                      <CardTitle className="text-sm sm:text-base font-semibold">עלות שכר</CardTitle>
+                      <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-red-500" />
                     </div>
                   </CardHeader>
-                  <CardContent className="p-3 pt-0">
-                    <div className="text-lg sm:text-xl font-bold text-red-600">
+                  <CardContent className="p-4 sm:p-5 pt-0">
+                    <div className="text-2xl sm:text-3xl font-bold text-red-600">
                       {formatCurrency(report.summary.totalCost)}
                     </div>
                     {report.summary.totalRevenue > 0 && (
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-sm text-muted-foreground mt-1">
                         {report.summary.salaryPercentage.toFixed(1)}% מההכנסות
                       </div>
                     )}
@@ -302,15 +302,15 @@ export default function ReportsPage() {
               </StaggerItem>
 
               <StaggerItem>
-                <Card>
-                  <CardHeader className="p-3 pb-1">
+                <Card className="shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader className="p-4 sm:p-5 pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-xs sm:text-sm font-medium">טיפים</CardTitle>
-                      <Coins className="h-4 w-4 text-amber-500" />
+                      <CardTitle className="text-sm sm:text-base font-semibold">טיפים</CardTitle>
+                      <Coins className="h-5 w-5 sm:h-6 sm:w-6 text-amber-500" />
                     </div>
                   </CardHeader>
-                  <CardContent className="p-3 pt-0">
-                    <div className="text-lg sm:text-xl font-bold text-amber-600">
+                  <CardContent className="p-4 sm:p-5 pt-0">
+                    <div className="text-2xl sm:text-3xl font-bold text-amber-600">
                       {formatCurrency(report.summary.totalTips || 0)}
                     </div>
                   </CardContent>
@@ -318,15 +318,15 @@ export default function ReportsPage() {
               </StaggerItem>
 
               <StaggerItem>
-                <Card>
-                  <CardHeader className="p-3 pb-1">
+                <Card className="shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader className="p-4 sm:p-5 pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-xs sm:text-sm font-medium">רווח</CardTitle>
-                      <PieChart className="h-4 w-4 text-green-500" />
+                      <CardTitle className="text-sm sm:text-base font-semibold">רווח</CardTitle>
+                      <PieChart className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />
                     </div>
                   </CardHeader>
-                  <CardContent className="p-3 pt-0">
-                    <div className="text-lg sm:text-xl font-bold text-green-600">
+                  <CardContent className="p-4 sm:p-5 pt-0">
+                    <div className="text-2xl sm:text-3xl font-bold text-green-600">
                       {report.summary.profitMargin.toFixed(1)}%
                     </div>
                   </CardContent>
@@ -334,15 +334,15 @@ export default function ReportsPage() {
               </StaggerItem>
 
               <StaggerItem>
-                <Card>
-                  <CardHeader className="p-3 pb-1">
+                <Card className="shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader className="p-4 sm:p-5 pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-xs sm:text-sm font-medium">שעות</CardTitle>
-                      <Clock className="h-4 w-4 text-blue-500" />
+                      <CardTitle className="text-sm sm:text-base font-semibold">שעות</CardTitle>
+                      <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
                     </div>
                   </CardHeader>
-                  <CardContent className="p-3 pt-0">
-                    <div className="text-lg sm:text-xl font-bold text-blue-600">
+                  <CardContent className="p-4 sm:p-5 pt-0">
+                    <div className="text-2xl sm:text-3xl font-bold text-blue-600">
                       {report.summary.totalHours.toFixed(1)}
                     </div>
                   </CardContent>
@@ -350,15 +350,15 @@ export default function ReportsPage() {
               </StaggerItem>
 
               <StaggerItem>
-                <Card>
-                  <CardHeader className="p-3 pb-1">
+                <Card className="shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader className="p-4 sm:p-5 pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-xs sm:text-sm font-medium">עובדים</CardTitle>
-                      <Users className="h-4 w-4 text-purple-500" />
+                      <CardTitle className="text-sm sm:text-base font-semibold">עובדים</CardTitle>
+                      <Users className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />
                     </div>
                   </CardHeader>
-                  <CardContent className="p-3 pt-0">
-                    <div className="text-lg sm:text-xl font-bold text-purple-600">
+                  <CardContent className="p-4 sm:p-5 pt-0">
+                    <div className="text-2xl sm:text-3xl font-bold text-purple-600">
                       {report.summary.employeeCount}
                     </div>
                   </CardContent>
