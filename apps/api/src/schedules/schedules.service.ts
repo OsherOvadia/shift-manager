@@ -258,10 +258,10 @@ export class SchedulesService {
 
   private normalizeToWeekStart(date: Date): Date {
     const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day;
-    d.setDate(diff);
-    d.setHours(0, 0, 0, 0);
+    // Use UTC methods to avoid timezone shifts when parsing ISO dates
+    const day = d.getUTCDay();
+    d.setUTCDate(d.getUTCDate() - day);
+    d.setUTCHours(0, 0, 0, 0);
     return d;
   }
 }

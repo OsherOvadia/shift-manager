@@ -81,12 +81,20 @@ export default function RevenuePage() {
 
   const isLoading = scheduleLoading || revenueLoading
 
+  // Helper to extract date string
+  const getDateStr = (date: Date | string) => {
+    if (typeof date === 'string') {
+      return date.split('T')[0]
+    }
+    return formatDateLocal(date)
+  }
+
   // Initialize revenue inputs from fetched data
   useEffect(() => {
     if (revenueData && Array.isArray(revenueData)) {
       const newInputs: { [key: string]: string } = {}
       revenueData.forEach((r: any) => {
-        const dateKey = formatDateLocal(new Date(r.date))
+        const dateKey = getDateStr(r.date)
         newInputs[dateKey] = r.totalRevenue.toString()
       })
       setRevenueInputs(prev => ({ ...newInputs, ...prev }))
@@ -200,18 +208,22 @@ export default function RevenuePage() {
 
   // Get shifts for a specific date
   const getShiftsForDate = (date: Date) => {
-    if (!scheduleData?.shiftAssignments) return []
-    const dateStr = formatDateLocal(date)
-    return scheduleData.shiftAssignments.filter((a: any) => 
-      formatDateLocal(new Date(a.shiftDate)) === dateStr && a.status !== 'CANCELLED'
-    )
+    if (!scheduleData?.shiftAssignments) {
+      return []
+    }
+    const dateStr = getDateStr(date)
+    
+    return scheduleData.shiftAssignments.filter((a: any) => {
+      const assignmentDateStr = getDateStr(a.shiftDate)
+      return assignmentDateStr === dateStr
+    })
   }
 
   // Get revenue for a specific date
   const getRevenueForDate = (date: Date) => {
     if (!revenueData || !Array.isArray(revenueData)) return null
-    const dateStr = formatDateLocal(date)
-    return revenueData.find((r: any) => formatDateLocal(new Date(r.date)) === dateStr)
+    const dateStr = getDateStr(date)
+    return revenueData.find((r: any) => getDateStr(r.date) === dateStr)
   }
 
   // Calculate totals for summary

@@ -147,13 +147,20 @@ export default function ManageSchedulePage() {
     },
   })
 
+  // Helper to refresh schedule data
+  const refreshScheduleData = () => {
+    queryClient.invalidateQueries({ queryKey: ['schedules'] })
+    if (currentSchedule?.id) {
+      queryClient.invalidateQueries({ queryKey: ['schedule', currentSchedule.id] })
+    }
+  }
+
   // Create assignment mutation
   const createAssignmentMutation = useMutation({
     mutationFn: (data: { scheduleId: string; userId: string; shiftTemplateId: string; shiftDate: string }) =>
       api.post('/assignments', data, accessToken!),
     onSuccess: () => {
-      toast({ title: 'השיבוץ נוסף בהצלחה' })
-      queryClient.invalidateQueries({ queryKey: ['schedule'] })
+      // Don't show toast here - we'll show it after all assignments are added
     },
     onError: (error: any) => {
       toast({
@@ -169,7 +176,7 @@ export default function ManageSchedulePage() {
     mutationFn: (id: string) => api.delete(`/assignments/${id}`, accessToken!),
     onSuccess: () => {
       toast({ title: 'השיבוץ הוסר' })
-      queryClient.invalidateQueries({ queryKey: ['schedule'] })
+      refreshScheduleData()
     },
     onError: (error: any) => {
       toast({
@@ -185,8 +192,7 @@ export default function ManageSchedulePage() {
     mutationFn: () => api.post(`/schedules/${currentSchedule!.id}/publish`, {}, accessToken!),
     onSuccess: () => {
       toast({ title: 'לוח המשמרות פורסם בהצלחה' })
-      queryClient.invalidateQueries({ queryKey: ['schedules'] })
-      queryClient.invalidateQueries({ queryKey: ['schedule'] })
+      refreshScheduleData()
     },
     onError: (error: any) => {
       toast({
@@ -231,6 +237,9 @@ export default function ManageSchedulePage() {
       })
     }
 
+    // Refresh schedule data first
+    await queryClient.refetchQueries({ queryKey: ['schedule', currentSchedule.id] })
+
     toast({
       title: 'השיבוצים נוספו בהצלחה',
       description: `${selectedWorkers.length} עובדים שובצו למשמרת`,
@@ -239,7 +248,6 @@ export default function ManageSchedulePage() {
     // Close dialog and reset
     setSelectedShift(null)
     setSelectedWorkers([])
-    queryClient.invalidateQueries({ queryKey: ['schedule'] })
   }
 
   const openShiftDialog = (date: Date, shiftType: string) => {
