@@ -24,9 +24,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
+import { Checkbox } from '@/components/ui/checkbox'
 import { api } from '@/lib/api'
 import { useAuthStore, isAdmin } from '@/lib/auth'
-import { Loader2, Plus, UserPlus, Trash2, DollarSign } from 'lucide-react'
+import { Loader2, Plus, UserPlus, Trash2, Edit } from 'lucide-react'
 
 export default function EmployeesPage() {
   const { toast } = useToast()
@@ -34,6 +35,8 @@ export default function EmployeesPage() {
   const { accessToken } = useAuthStore()
   const isAdminRole = isAdmin()
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editingEmployee, setEditingEmployee] = useState<any>(null)
   const [newEmployee, setNewEmployee] = useState({
     email: '',
     password: '',
@@ -90,6 +93,26 @@ export default function EmployeesPage() {
     },
   })
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      api.patch(`/users/${id}`, data, accessToken!),
+    onSuccess: () => {
+      toast({
+        title: 'העובד עודכן בהצלחה',
+      })
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      setIsEditDialogOpen(false)
+      setEditingEmployee(null)
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'שגיאה',
+        description: error.message,
+      })
+    },
+  })
+
   const deactivateMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/users/${id}`, accessToken!),
     onSuccess: () => {
@@ -106,6 +129,34 @@ export default function EmployeesPage() {
       })
     },
   })
+
+  const handleEditEmployee = (employee: any) => {
+    setEditingEmployee({
+      ...employee,
+      hourlyWage: employee.hourlyWage?.toString() || '',
+      baseHourlyWage: employee.baseHourlyWage?.toString() || '',
+      isTipBased: employee.isTipBased || false,
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleUpdateEmployee = () => {
+    if (!editingEmployee) return
+
+    const updateData: any = {
+      hourlyWage: editingEmployee.hourlyWage ? parseFloat(editingEmployee.hourlyWage) : undefined,
+      isTipBased: editingEmployee.isTipBased,
+    }
+
+    if (editingEmployee.isTipBased && editingEmployee.baseHourlyWage) {
+      updateData.baseHourlyWage = parseFloat(editingEmployee.baseHourlyWage)
+    }
+
+    updateMutation.mutate({
+      id: editingEmployee.id,
+      data: updateData,
+    })
+  }
 
   const getRoleLabel = (role: string) => {
     switch (role) {
@@ -329,28 +380,131 @@ export default function EmployeesPage() {
                 {employee.hourlyWage > 0 && (
                   <div className="flex items-center gap-1 text-sm text-muted-foreground mb-3">
                     <span>₪{employee.hourlyWage.toFixed(2)} לשעה</span>
+                    {employee.isTipBased && (
+                      <Badge variant="outline" className="text-[10px] text-amber-600">מבוסס טיפים</Badge>
+                    )}
                   </div>
                 )}
-                {employee.isActive && employee.role === 'EMPLOYEE' && (
+                <div className="flex gap-2">
                   <Button
-                    variant="destructive"
+                    variant="outline"
                     size="sm"
-                    className="w-full sm:w-auto"
-                    onClick={() => {
-                      if (confirm('האם אתה בטוח שברצונך להשבית עובד זה?')) {
-                        deactivateMutation.mutate(employee.id)
-                      }
-                    }}
+                    className="flex-1"
+                    onClick={() => handleEditEmployee(employee)}
                   >
-                    <Trash2 className="h-4 w-4 ml-2" />
-                    השבת
+                    <Edit className="h-4 w-4 ml-2" />
+                    ערוך
                   </Button>
-                )}
+                  {employee.isActive && employee.role === 'EMPLOYEE' && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => {
+                        if (confirm('האם אתה בטוח שברצונך להשבית עובד זה?')) {
+                          deactivateMutation.mutate(employee.id)
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 ml-2" />
+                      השבת
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      {/* Edit Employee Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ערוך עובד</DialogTitle>
+            <DialogDescription>
+              עדכן פרטי שכר ומעמד טיפים
+            </DialogDescription>
+          </DialogHeader>
+          {editingEmployee && (
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label className="font-medium">
+                  {editingEmployee.firstName} {editingEmployee.lastName}
+                </Label>
+                <p className="text-sm text-muted-foreground">{editingEmployee.email}</p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2 space-x-reverse">
+                  <Checkbox
+                    id="isTipBased"
+                    checked={editingEmployee.isTipBased}
+                    onCheckedChange={(checked) =>
+                      setEditingEmployee({ ...editingEmployee, isTipBased: checked })
+                    }
+                  />
+                  <Label htmlFor="isTipBased" className="cursor-pointer">
+                    עובד מבוסס טיפים (מלצר)
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  סמן אם העובד מקבל שכר בסיס שיכול להתכסות על ידי טיפים
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="hourlyWage">שכר לשעה (₪)</Label>
+                <Input
+                  id="hourlyWage"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editingEmployee.hourlyWage}
+                  onChange={(e) =>
+                    setEditingEmployee({ ...editingEmployee, hourlyWage: e.target.value })
+                  }
+                />
+              </div>
+
+              {editingEmployee.isTipBased && (
+                <div className="space-y-2">
+                  <Label htmlFor="baseHourlyWage">שכר בסיס לשעה (₪)</Label>
+                  <Input
+                    id="baseHourlyWage"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="40.00"
+                    value={editingEmployee.baseHourlyWage}
+                    onChange={(e) =>
+                      setEditingEmployee({ ...editingEmployee, baseHourlyWage: e.target.value })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    השכר המינימלי שהמנהל משלם אם הטיפים לא מכסים
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              ביטול
+            </Button>
+            <Button
+              onClick={handleUpdateEmployee}
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'שמור שינויים'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
