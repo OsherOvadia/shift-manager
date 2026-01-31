@@ -1,11 +1,11 @@
-import { Controller, Post, Query, UnauthorizedException, InternalServerErrorException } from '@nestjs/common';
+import { Controller, Get, Query, UnauthorizedException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('database-reset')
 export class DatabaseResetController {
   constructor(private readonly prisma: PrismaService) {}
 
-  @Post()
+  @Get()
   async resetDatabase(@Query('secret') secret: string) {
     // Check if secret matches
     const RESET_SECRET = process.env.DB_RESET_SECRET || 'CHANGE_THIS_SECRET_12345';
