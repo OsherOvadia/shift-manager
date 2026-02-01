@@ -215,14 +215,18 @@ export default function DashboardLayout({
               </Link>
             </Button>
             
-            {/* Mobile menu button (leftmost visually in RTL) */}
+            {/* Mobile menu button (leftmost visually in RTL) - 3 lines hamburger */}
             <Button
               variant="ghost"
               size="icon"
               className="md:hidden h-10 w-10 sm:h-11 sm:w-11 hover:bg-primary/10"
               onClick={() => setSidebarOpen(true)}
             >
-              <Menu className="h-6 w-6" />
+              <div className="flex flex-col gap-1.5">
+                <div className="w-5 h-0.5 bg-foreground rounded-full"></div>
+                <div className="w-5 h-0.5 bg-foreground rounded-full"></div>
+                <div className="w-5 h-0.5 bg-foreground rounded-full"></div>
+              </div>
             </Button>
           </div>
         </div>
