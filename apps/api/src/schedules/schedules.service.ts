@@ -40,7 +40,14 @@ export class SchedulesService {
           },
         },
         shiftAssignments: {
-          include: {
+          select: {
+            id: true,
+            shiftDate: true,
+            status: true,
+            tipsEarned: true,
+            sittingTips: true,
+            takeawayTips: true,
+            deliveryTips: true,
             user: {
               select: {
                 id: true,
@@ -216,7 +223,14 @@ export class SchedulesService {
           where: {
             status: { not: 'CANCELLED' },
           },
-          include: {
+          select: {
+            id: true,
+            shiftDate: true,
+            status: true,
+            tipsEarned: true,
+            sittingTips: true,
+            takeawayTips: true,
+            deliveryTips: true,
             user: {
               select: {
                 id: true,

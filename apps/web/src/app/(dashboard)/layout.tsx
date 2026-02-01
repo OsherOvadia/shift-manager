@@ -177,29 +177,9 @@ export default function DashboardLayout({
             </Link>
           </div>
 
-          {/* Right side - Actions and Menu */}
+          {/* Right side - Actions and Menu (ordered for RTL: last in code = leftmost visually) */}
           <div className="flex items-center gap-1 sm:gap-2">
-            {/* Mobile menu button - First (leftmost in RTL) */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden h-10 w-10 sm:h-11 sm:w-11 hover:bg-primary/10"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu className="h-6 w-6" />
-            </Button>
-            
-            {/* Notifications */}
-            <Button variant="ghost" size="icon" asChild className="h-9 w-9 sm:h-10 sm:w-10">
-              <Link href="/dashboard/notifications">
-                <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
-              </Link>
-            </Button>
-            
-            {/* Theme Toggle */}
-            <ThemeToggle />
-
-            {/* User Menu - Desktop */}
+            {/* User Menu - Desktop (rightmost visually in RTL) */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 sm:h-10 sm:w-10 rounded-full hidden sm:flex">
@@ -224,6 +204,26 @@ export default function DashboardLayout({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            
+            {/* Theme Toggle */}
+            <ThemeToggle />
+            
+            {/* Notifications */}
+            <Button variant="ghost" size="icon" asChild className="h-9 w-9 sm:h-10 sm:w-10">
+              <Link href="/dashboard/notifications">
+                <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
+              </Link>
+            </Button>
+            
+            {/* Mobile menu button (leftmost visually in RTL) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden h-10 w-10 sm:h-11 sm:w-11 hover:bg-primary/10"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu className="h-6 w-6" />
+            </Button>
           </div>
         </div>
       </header>
@@ -250,10 +250,10 @@ export default function DashboardLayout({
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-10 w-10 hover:bg-destructive/10" 
+              className="h-11 w-11 hover:bg-destructive/10 border border-destructive/20" 
               onClick={() => setSidebarOpen(false)}
             >
-              <X className="h-6 w-6 text-destructive" />
+              <X className="block h-7 w-7 min-h-7 min-w-7 text-destructive" strokeWidth={2.5} />
             </Button>
           </div>
           

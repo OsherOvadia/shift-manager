@@ -134,27 +134,35 @@ export default function RevenuePage() {
   }, [scheduleData])
 
   const updateShiftDataMutation = useMutation({
-    mutationFn: ({ assignmentIds, sitting, takeaway, delivery, tips }: { 
+    mutationFn: async ({ assignmentIds, sitting, takeaway, delivery, tips }: { 
       assignmentIds: string[]; 
       sitting: number; 
       takeaway: number; 
       delivery: number;
       tips: number;
-    }) =>
+    }) => {
+      console.log('Saving revenue data:', { assignmentIds, sitting, takeaway, delivery, tips })
       // Update all workers in the shift with the same values
-      Promise.all(assignmentIds.map(id =>
+      const results = await Promise.all(assignmentIds.map(id =>
         api.patch(`/assignments/${id}`, { 
           sittingTips: sitting,
           takeawayTips: takeaway,
           deliveryTips: delivery,
           tipsEarned: tips 
         }, accessToken!)
-      )),
+      ))
+      console.log('Save results:', results)
+      return results
+    },
     onSuccess: async () => {
-      // Refetch the specific week's data immediately
+      console.log('Save successful, invalidating caches...')
+      // Invalidate and refetch all related queries
+      await queryClient.invalidateQueries({ queryKey: ['schedule-week'] })
+      await queryClient.invalidateQueries({ queryKey: ['weekly-costs'] })
+      await queryClient.invalidateQueries({ queryKey: ['daily-revenues'] })
+      
+      // Force refetch the specific week's data
       await queryClient.refetchQueries({ queryKey: ['schedule-week', weekStart.toISOString()] })
-      queryClient.invalidateQueries({ queryKey: ['weekly-costs'] })
-      queryClient.invalidateQueries({ queryKey: ['daily-revenues'] })
       
       toast({
         title: 'נשמר בהצלחה',
@@ -163,6 +171,7 @@ export default function RevenuePage() {
       setSavingData(null)
     },
     onError: (error: any) => {
+      console.error('Save error:', error)
       toast({
         title: 'שגיאה',
         description: error.message || 'לא ניתן לשמור את הנתונים',
