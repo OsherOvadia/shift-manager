@@ -115,12 +115,29 @@ export class AssignmentsService {
 
     const updateData: any = {};
     if (updateDto.status !== undefined) updateData.status = updateDto.status as any;
-    if (updateDto.tipsEarned !== undefined) updateData.tipsEarned = updateDto.tipsEarned;
-    if (updateDto.sittingTips !== undefined) updateData.sittingTips = updateDto.sittingTips;
-    if (updateDto.takeawayTips !== undefined) updateData.takeawayTips = updateDto.takeawayTips;
-    if (updateDto.deliveryTips !== undefined) updateData.deliveryTips = updateDto.deliveryTips;
+    
+    // Always set numeric fields if they are provided (including 0)
+    if (typeof updateDto.tipsEarned === 'number') {
+      updateData.tipsEarned = updateDto.tipsEarned;
+    }
+    if (typeof updateDto.sittingTips === 'number') {
+      updateData.sittingTips = updateDto.sittingTips;
+    }
+    if (typeof updateDto.takeawayTips === 'number') {
+      updateData.takeawayTips = updateDto.takeawayTips;
+    }
+    if (typeof updateDto.deliveryTips === 'number') {
+      updateData.deliveryTips = updateDto.deliveryTips;
+    }
 
     console.log('Update data to save:', JSON.stringify(updateData, null, 2));
+    console.log('UpdateDto values:', {
+      tipsEarned: updateDto.tipsEarned,
+      sittingTips: updateDto.sittingTips,
+      takeawayTips: updateDto.takeawayTips,
+      deliveryTips: updateDto.deliveryTips,
+      typeOfSitting: typeof updateDto.sittingTips,
+    });
 
     const updatedAssignment = await this.prisma.shiftAssignment.update({
       where: { id },
