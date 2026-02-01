@@ -112,6 +112,9 @@ export class AssignmentsService {
     const updateData: any = {};
     if (updateDto.status !== undefined) updateData.status = updateDto.status as any;
     if (updateDto.tipsEarned !== undefined) updateData.tipsEarned = updateDto.tipsEarned;
+    if (updateDto.sittingTips !== undefined) updateData.sittingTips = updateDto.sittingTips;
+    if (updateDto.takeawayTips !== undefined) updateData.takeawayTips = updateDto.takeawayTips;
+    if (updateDto.deliveryTips !== undefined) updateData.deliveryTips = updateDto.deliveryTips;
 
     const updatedAssignment = await this.prisma.shiftAssignment.update({
       where: { id },

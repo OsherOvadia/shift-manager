@@ -179,28 +179,25 @@ export default function DashboardLayout({
 
           {/* Right side - Actions and Menu */}
           <div className="flex items-center gap-1 sm:gap-2">
-            {/* Mobile menu button - Right side (left in RTL) with hamburger icon */}
+            {/* Mobile menu button - First (leftmost in RTL) */}
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden h-11 w-11 hover:bg-primary/10"
+              className="md:hidden h-10 w-10 sm:h-11 sm:w-11 hover:bg-primary/10"
               onClick={() => setSidebarOpen(true)}
             >
-              <div className="flex flex-col gap-1">
-                <div className="w-5 h-0.5 bg-foreground rounded-full"></div>
-                <div className="w-5 h-0.5 bg-foreground rounded-full"></div>
-                <div className="w-5 h-0.5 bg-foreground rounded-full"></div>
-              </div>
+              <Menu className="h-6 w-6" />
             </Button>
-            {/* Theme Toggle */}
-            <ThemeToggle />
             
             {/* Notifications */}
-            <Button variant="ghost" size="icon" asChild className="h-8 w-8 sm:h-9 sm:w-9">
+            <Button variant="ghost" size="icon" asChild className="h-9 w-9 sm:h-10 sm:w-10">
               <Link href="/dashboard/notifications">
-                <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
               </Link>
             </Button>
+            
+            {/* Theme Toggle */}
+            <ThemeToggle />
 
             {/* User Menu - Desktop */}
             <DropdownMenu>
