@@ -97,6 +97,10 @@ export class AssignmentsService {
   }
 
   async update(id: string, updateDto: UpdateAssignmentDto, organizationId: string) {
+    console.log('=== Assignment Update ===');
+    console.log('ID:', id);
+    console.log('Received DTO:', JSON.stringify(updateDto, null, 2));
+    
     const assignment = await this.prisma.shiftAssignment.findFirst({
       where: { id },
       include: {
@@ -116,6 +120,8 @@ export class AssignmentsService {
     if (updateDto.takeawayTips !== undefined) updateData.takeawayTips = updateDto.takeawayTips;
     if (updateDto.deliveryTips !== undefined) updateData.deliveryTips = updateDto.deliveryTips;
 
+    console.log('Update data to save:', JSON.stringify(updateData, null, 2));
+
     const updatedAssignment = await this.prisma.shiftAssignment.update({
       where: { id },
       data: updateData,
@@ -130,6 +136,18 @@ export class AssignmentsService {
         shiftTemplate: true,
       },
     });
+
+    // Verify what was saved by re-reading
+    const verifyAssignment = await this.prisma.shiftAssignment.findUnique({
+      where: { id },
+      select: {
+        sittingTips: true,
+        takeawayTips: true,
+        deliveryTips: true,
+        tipsEarned: true,
+      },
+    });
+    console.log('Verified saved data:', JSON.stringify(verifyAssignment, null, 2));
 
     // If schedule is published and assignment changed, notify user
     if (assignment.schedule.status === 'PUBLISHED') {
