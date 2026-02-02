@@ -17,12 +17,17 @@ export class AuthService {
   ) {}
 
   async login(loginDto: LoginDto) {
+    const startTime = Date.now();
     const { email, password, rememberMe } = loginDto;
 
+    console.log('🔐 Login attempt for:', email);
+    
+    const dbStartTime = Date.now();
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { organization: true, jobCategory: true },
     });
+    console.log(`   ✓ DB query took: ${Date.now() - dbStartTime}ms`);
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('שם משתמש או סיסמה שגויים');
@@ -32,14 +37,24 @@ export class AuthService {
       throw new UnauthorizedException('החשבון שלך ממתין לאישור מנהל');
     }
 
+    const bcryptStartTime = Date.now();
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    console.log(`   ✓ Password comparison took: ${Date.now() - bcryptStartTime}ms`);
+    
     if (!isPasswordValid) {
       throw new UnauthorizedException('שם משתמש או סיסמה שגויים');
     }
 
+    const tokenStartTime = Date.now();
     const tokens = await this.generateTokens(user, rememberMe);
+    console.log(`   ✓ Token generation took: ${Date.now() - tokenStartTime}ms`);
+    
+    const saveTokenStartTime = Date.now();
     await this.saveRefreshToken(user.id, tokens.refreshToken, rememberMe);
+    console.log(`   ✓ Save refresh token took: ${Date.now() - saveTokenStartTime}ms`);
 
+    console.log(`   ✅ Total login time: ${Date.now() - startTime}ms`);
+    
     return {
       ...tokens,
       user: this.sanitizeUser(user),
@@ -75,7 +90,9 @@ export class AuthService {
       throw new UnauthorizedException('ארגון לא נמצא. אנא בדוק את שם הארגון ונסה שוב.');
     }
 
-    const passwordHash = await bcrypt.hash(signupDto.password, 12);
+    // Using 10 rounds for better performance while maintaining security
+    // 10 rounds = ~100ms, 12 rounds = ~400ms
+    const passwordHash = await bcrypt.hash(signupDto.password, 10);
 
     const user = await this.prisma.user.create({
       data: {
@@ -136,7 +153,9 @@ export class AuthService {
       throw new ConflictException('כתובת האימייל כבר קיימת במערכת');
     }
 
-    const passwordHash = await bcrypt.hash(registerDto.password, 12);
+    // Using 10 rounds for better performance while maintaining security
+    // 10 rounds = ~100ms, 12 rounds = ~400ms
+    const passwordHash = await bcrypt.hash(registerDto.password, 10);
 
     const user = await this.prisma.user.create({
       data: {

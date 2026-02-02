@@ -84,3 +84,15 @@ export function parseLocalDate(dateString: string): Date {
   const [year, month, day] = dateString.split('-').map(Number)
   return new Date(year, month - 1, day)
 }
+
+// Check if a shift is closed based on business settings
+export function isShiftClosed(
+  date: Date,
+  shiftType: string,
+  closedPeriods: Array<{ day: number; shiftTypes: string[] }> = []
+): boolean {
+  const dayOfWeek = date.getDay() // 0=Sunday, 6=Saturday
+  return closedPeriods.some(
+    (period) => period.day === dayOfWeek && period.shiftTypes.includes(shiftType)
+  )
+}

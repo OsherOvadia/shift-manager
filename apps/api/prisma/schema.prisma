@@ -94,6 +94,7 @@ model BusinessSettings {
   weekendDays            Int[]    @default([5, 6]) @map("weekend_days")
   submissionDeadlineDay  Int      @default(4) @map("submission_deadline_day")
   submissionDeadlineHour Int      @default(18) @map("submission_deadline_hour")
+  closedPeriods          Json?    @default("[]") @map("closed_periods")
   createdAt              DateTime @default(now()) @map("created_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

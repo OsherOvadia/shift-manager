@@ -22,6 +22,7 @@ export class SettingsService {
           weekendDays: isPostgres ? [4, 5, 6] : '4,5,6',
           submissionDeadlineDay: 3,
           submissionDeadlineHour: 18,
+          closedPeriods: [],
         } as any,
       });
       // Return with parsed weekendDays for API response
@@ -30,15 +31,17 @@ export class SettingsService {
         weekendDays: Array.isArray(created.weekendDays) 
           ? created.weekendDays 
           : (created.weekendDays as any).split(',').map((d: string) => parseInt(d, 10)),
+        closedPeriods: created.closedPeriods || [],
       };
     }
 
-    // Return with parsed weekendDays for API response
+    // Return with parsed weekendDays and closedPeriods for API response
     return {
       ...settings,
       weekendDays: Array.isArray(settings.weekendDays) 
         ? settings.weekendDays 
         : (settings.weekendDays as any).split(',').map((d: string) => parseInt(d, 10)),
+      closedPeriods: settings.closedPeriods || [],
     };
   }
 
@@ -62,6 +65,9 @@ export class SettingsService {
     if (updateDto.submissionDeadlineHour !== undefined) {
       dataToSave.submissionDeadlineHour = updateDto.submissionDeadlineHour;
     }
+    if (updateDto.closedPeriods !== undefined) {
+      dataToSave.closedPeriods = updateDto.closedPeriods;
+    }
 
     if (!settings) {
       // Create with provided values
@@ -71,6 +77,7 @@ export class SettingsService {
           weekendDays: dataToSave.weekendDays || (isPostgres ? [4, 5, 6] : '4,5,6'),
           submissionDeadlineDay: dataToSave.submissionDeadlineDay || 3,
           submissionDeadlineHour: dataToSave.submissionDeadlineHour || 18,
+          closedPeriods: dataToSave.closedPeriods || [],
         } as any,
       });
       return {
@@ -78,6 +85,7 @@ export class SettingsService {
         weekendDays: Array.isArray(created.weekendDays) 
           ? created.weekendDays 
           : (created.weekendDays as any).split(',').map((d: string) => parseInt(d, 10)),
+        closedPeriods: created.closedPeriods || [],
       };
     }
 
@@ -91,6 +99,7 @@ export class SettingsService {
       weekendDays: Array.isArray(updated.weekendDays) 
         ? updated.weekendDays 
         : (updated.weekendDays as any).split(',').map((d: string) => parseInt(d, 10)),
+      closedPeriods: updated.closedPeriods || [],
     };
   }
 }

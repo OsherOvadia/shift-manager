@@ -35,10 +35,22 @@ const HOURS = Array.from({ length: 24 }, (_, i) => ({
   label: `${i.toString().padStart(2, '0')}:00`,
 }))
 
+const SHIFT_TYPES = [
+  { value: 'MORNING', label: 'בוקר' },
+  { value: 'EVENING', label: 'ערב' },
+  { value: 'EVENING_CLOSE', label: 'ערב + סגירה' },
+]
+
+interface ClosedPeriod {
+  day: number
+  shiftTypes: string[]
+}
+
 interface SettingsFormData {
   weekendDays: number[]
   submissionDeadlineDay: number
   submissionDeadlineHour: number
+  closedPeriods: ClosedPeriod[]
 }
 
 export default function SettingsPage() {
@@ -66,10 +78,12 @@ export default function SettingsPage() {
       weekendDays: [4, 5, 6],
       submissionDeadlineDay: 3,
       submissionDeadlineHour: 18,
+      closedPeriods: [],
     },
   })
 
   const weekendDays = watch('weekendDays')
+  const closedPeriods = watch('closedPeriods')
 
   useEffect(() => {
     if (settings) {
@@ -77,6 +91,7 @@ export default function SettingsPage() {
         weekendDays: settings.weekendDays || [4, 5, 6],
         submissionDeadlineDay: settings.submissionDeadlineDay ?? 3,
         submissionDeadlineHour: settings.submissionDeadlineHour ?? 18,
+        closedPeriods: settings.closedPeriods || [],
       })
     }
   }, [settings, reset])
@@ -108,6 +123,48 @@ export default function SettingsPage() {
       )
     } else {
       setValue('weekendDays', [...current, day])
+    }
+  }
+
+  const isShiftClosed = (day: number, shiftType: string): boolean => {
+    const periods = closedPeriods || []
+    const period = periods.find((p) => p.day === day)
+    return period ? period.shiftTypes.includes(shiftType) : false
+  }
+
+  const toggleClosedShift = (day: number, shiftType: string) => {
+    const periods = closedPeriods || []
+    const existingPeriodIndex = periods.findIndex((p) => p.day === day)
+
+    if (existingPeriodIndex >= 0) {
+      const existingPeriod = periods[existingPeriodIndex]
+      if (existingPeriod.shiftTypes.includes(shiftType)) {
+        // Remove this shift type
+        const newShiftTypes = existingPeriod.shiftTypes.filter((t) => t !== shiftType)
+        if (newShiftTypes.length === 0) {
+          // Remove the entire period if no shift types left
+          setValue(
+            'closedPeriods',
+            periods.filter((_, i) => i !== existingPeriodIndex)
+          )
+        } else {
+          // Update with remaining shift types
+          const newPeriods = [...periods]
+          newPeriods[existingPeriodIndex] = { day, shiftTypes: newShiftTypes }
+          setValue('closedPeriods', newPeriods)
+        }
+      } else {
+        // Add this shift type
+        const newPeriods = [...periods]
+        newPeriods[existingPeriodIndex] = {
+          day,
+          shiftTypes: [...existingPeriod.shiftTypes, shiftType],
+        }
+        setValue('closedPeriods', newPeriods)
+      }
+    } else {
+      // Create new period with this shift type
+      setValue('closedPeriods', [...periods, { day, shiftTypes: [shiftType] }])
     }
   }
 
@@ -209,6 +266,47 @@ export default function SettingsPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Closed Periods */}
+          <Card>
+            <CardHeader>
+              <CardTitle>תקופות סגורות</CardTitle>
+              <CardDescription>
+                בחר משמרות שלא יוצגו במערכת (למשל: שישי ערב, שבת בוקר)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid gap-4">
+                  {DAYS.map((day) => (
+                    <div key={day.value} className="space-y-2">
+                      <Label className="font-semibold">{day.label}</Label>
+                      <div className="flex flex-wrap gap-4 mr-4">
+                        {SHIFT_TYPES.map((shift) => (
+                          <div key={shift.value} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`closed-${day.value}-${shift.value}`}
+                              checked={isShiftClosed(day.value, shift.value)}
+                              onCheckedChange={() => toggleClosedShift(day.value, shift.value)}
+                            />
+                            <Label
+                              htmlFor={`closed-${day.value}-${shift.value}`}
+                              className="cursor-pointer text-sm"
+                            >
+                              {shift.label}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-muted-foreground pt-2 border-t">
+                  משמרות סגורות לא יוצגו בהגשת זמינות ובניהול לוח המשמרות
                 </div>
               </div>
             </CardContent>

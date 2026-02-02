@@ -18,7 +18,7 @@ import {
 import { useToast } from '@/components/ui/use-toast'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
-import { getWeekStartDate, getWeekDates, getDayName, getDayLetter, formatShortDate, isWeekend, formatDateLocal } from '@/lib/utils'
+import { getWeekStartDate, getWeekDates, getDayName, getDayLetter, formatShortDate, isWeekend, formatDateLocal, isShiftClosed } from '@/lib/utils'
 import { Loader2, ChevronRight, ChevronLeft, Plus, Trash2, Send, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -37,6 +37,7 @@ export default function ManageSchedulePage() {
   
   const [weekOffset, setWeekOffset] = useState(0) // Default to current week
   const [weekendDays, setWeekendDays] = useState<number[]>([4, 5, 6]) // Thu, Fri, Sat
+  const [closedPeriods, setClosedPeriods] = useState<Array<{ day: number; shiftTypes: string[] }>>([])
   const [selectedShift, setSelectedShift] = useState<{ date: Date; shiftType: string } | null>(null)
   const [selectedWorkers, setSelectedWorkers] = useState<string[]>([])
 
@@ -48,17 +49,20 @@ export default function ManageSchedulePage() {
   targetWeekStart.setUTCDate(targetWeekStart.getUTCDate() + weekOffset * 7)
   const weekDates = getWeekDates(targetWeekStart)
 
-  // Fetch business settings to get actual weekend days
+  // Fetch business settings to get actual weekend days and closed periods
   const { data: settings } = useQuery({
     queryKey: ['business-settings'],
     queryFn: () => api.get<any>('/settings', accessToken!),
     enabled: !!accessToken,
   })
 
-  // Update weekend days when settings are loaded
+  // Update weekend days and closed periods when settings are loaded
   useEffect(() => {
     if (settings?.weekendDays) {
       setWeekendDays(settings.weekendDays)
+    }
+    if (settings?.closedPeriods) {
+      setClosedPeriods(settings.closedPeriods)
     }
   }, [settings])
 
@@ -385,10 +389,13 @@ export default function ManageSchedulePage() {
             {formatShortDate(weekDates[0])} - {formatShortDate(weekDates[6])}
           </span>
           {currentSchedule && (
-            <div className="mt-1">
+            <div className="mt-1 flex flex-col items-center gap-1">
               <Badge variant={currentSchedule.status === 'PUBLISHED' ? 'success' : 'secondary'}>
                 {currentSchedule.status === 'PUBLISHED' ? 'פורסם' : 'טיוטה'}
               </Badge>
+              {currentSchedule.status === 'PUBLISHED' && (
+                <span className="text-xs text-muted-foreground">שינויים ישלחו התראה לעובדים</span>
+              )}
             </div>
           )}
         </div>
@@ -470,6 +477,7 @@ export default function ManageSchedulePage() {
                         <Badge className={shift.color}>{shift.label}</Badge>
                       </td>
                       {weekDates.map((date) => {
+                        const isClosed = isShiftClosed(date, shift.value, closedPeriods)
                         const assignments = getAssignmentsForDateAndShift(date, shift.value)
                         const template = getShiftTemplateByType(shift.value)
                         return (
@@ -477,19 +485,22 @@ export default function ManageSchedulePage() {
                             key={date.toISOString()}
                             className={cn(
                               'p-4 text-center align-top',
-                              isWeekend(date, weekendDays) && 'bg-blue-100 dark:bg-blue-950'
+                              isWeekend(date, weekendDays) && 'bg-blue-100 dark:bg-blue-950',
+                              isClosed && 'bg-muted opacity-50'
                             )}
                           >
-                            <div className="space-y-1 min-w-[180px]">
-                              {assignments.map((a: any) => (
-                                <div
-                                  key={a.id}
-                                  className="flex items-center justify-between text-sm p-2 bg-muted rounded group"
-                                >
-                                  <span>
-                                    {a.user.firstName} {a.user.lastName[0]}.
-                                  </span>
-                                  {currentSchedule.status === 'DRAFT' && (
+                            {isClosed ? (
+                              <div className="text-xs text-muted-foreground py-2">סגור</div>
+                            ) : (
+                              <div className="space-y-1 min-w-[180px]">
+                                {assignments.map((a: any) => (
+                                  <div
+                                    key={a.id}
+                                    className="flex items-center justify-between text-sm p-2 bg-muted rounded group"
+                                  >
+                                    <span>
+                                      {a.user.firstName} {a.user.lastName[0]}.
+                                    </span>
                                     <Button
                                       variant="ghost"
                                       size="icon"
@@ -498,21 +509,21 @@ export default function ManageSchedulePage() {
                                     >
                                       <Trash2 className="h-3 w-3" />
                                     </Button>
-                                  )}
-                                </div>
-                              ))}
-                              {currentSchedule.status === 'DRAFT' && template && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="w-full h-8 text-xs"
-                                  onClick={() => openShiftDialog(date, shift.value)}
-                                >
-                                  <Plus className="h-3 w-3 ml-1" />
-                                  הוסף עובדים
-                                </Button>
-                              )}
-                            </div>
+                                  </div>
+                                ))}
+                                {template && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full h-8 text-xs"
+                                    onClick={() => openShiftDialog(date, shift.value)}
+                                  >
+                                    <Plus className="h-3 w-3 ml-1" />
+                                    הוסף עובדים
+                                  </Button>
+                                )}
+                              </div>
+                            )}
                           </td>
                         )
                       })}

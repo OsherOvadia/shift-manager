@@ -55,24 +55,35 @@ export default function LoginPage() {
   const rememberMe = watch('rememberMe')
 
   const onSubmit = async (data: LoginFormData) => {
+    const startTime = Date.now()
+    console.log('🔐 Starting login process...')
+    
     setIsLoading(true)
     try {
+      const apiStartTime = Date.now()
       const response = await api.public.post<{
         accessToken: string
         refreshToken: string
         user: any
       }>('/auth/login', data)
+      console.log(`   ✓ API call took: ${Date.now() - apiStartTime}ms`)
 
+      const authStartTime = Date.now()
       // Store auth data with rememberMe preference
       setAuth(response.user, response.accessToken, response.refreshToken, data.rememberMe)
+      console.log(`   ✓ Auth store took: ${Date.now() - authStartTime}ms`)
 
       toast({
         title: 'התחברת בהצלחה',
         description: `שלום ${response.user.firstName}!`,
       })
 
+      const navStartTime = Date.now()
       router.push('/dashboard')
+      console.log(`   ✓ Navigation initiated in: ${Date.now() - navStartTime}ms`)
+      console.log(`   ✅ Total frontend login time: ${Date.now() - startTime}ms`)
     } catch (error: any) {
+      console.log(`   ❌ Login failed after: ${Date.now() - startTime}ms`)
       toast({
         variant: 'destructive',
         title: 'שגיאת התחברות',
@@ -128,14 +139,15 @@ export default function LoginPage() {
                 <p className="text-sm text-destructive">{errors.password.message}</p>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 py-1">
               <Checkbox
                 id="rememberMe"
                 checked={rememberMe}
                 onCheckedChange={(checked) => setValue('rememberMe', checked as boolean)}
                 disabled={isLoading}
+                className="h-5 w-5 min-h-5 min-w-5"
               />
-              <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">
+              <Label htmlFor="rememberMe" className="text-sm sm:text-base font-normal cursor-pointer select-none">
                 זכור אותי
               </Label>
             </div>

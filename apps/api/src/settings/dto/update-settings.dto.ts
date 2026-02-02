@@ -19,4 +19,11 @@ export class UpdateSettingsDto {
   @Max(23)
   @IsOptional()
   submissionDeadlineHour?: number;
+
+  @IsArray()
+  @IsOptional()
+  closedPeriods?: Array<{
+    day: number; // 0=Sunday, 6=Saturday
+    shiftTypes: string[]; // ['MORNING', 'EVENING', 'EVENING_CLOSE']
+  }>;
 }

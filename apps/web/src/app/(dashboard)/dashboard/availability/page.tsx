@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/ui/use-toast'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
-import { getWeekStartDate, getWeekDates, getDayName, formatShortDate, isWeekend, formatDateLocal, parseLocalDate } from '@/lib/utils'
+import { getWeekStartDate, getWeekDates, getDayName, formatShortDate, isWeekend, formatDateLocal, parseLocalDate, isShiftClosed } from '@/lib/utils'
 import { Loader2, ChevronRight, ChevronLeft, Save, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -32,24 +32,29 @@ export default function AvailabilityPage() {
   const [weekOffset, setWeekOffset] = useState(1) // Start with next week
   const [selectedSlots, setSelectedSlots] = useState<Map<string, AvailabilitySlot>>(new Map())
   const [weekendDays, setWeekendDays] = useState<number[]>([4, 5, 6]) // Thu, Fri, Sat
+  const [closedPeriods, setClosedPeriods] = useState<Array<{ day: number; shiftTypes: string[] }>>([])
   
   const currentWeekStart = getWeekStartDate(new Date())
   const targetWeekStart = new Date(currentWeekStart)
   targetWeekStart.setDate(targetWeekStart.getDate() + weekOffset * 7)
   const weekDates = getWeekDates(targetWeekStart)
 
-  // Fetch business settings to get actual weekend days
+  // Fetch business settings to get actual weekend days and closed periods
   const { data: settings } = useQuery({
     queryKey: ['business-settings'],
     queryFn: () => api.get<any>('/settings', accessToken!),
     enabled: !!accessToken,
   })
 
-  // Update weekend days when settings are loaded
+  // Update weekend days and closed periods when settings are loaded
   useEffect(() => {
     if (settings?.weekendDays) {
       console.log('📅 Loaded weekend days from settings:', settings.weekendDays)
       setWeekendDays(settings.weekendDays)
+    }
+    if (settings?.closedPeriods) {
+      console.log('🚫 Loaded closed periods from settings:', settings.closedPeriods)
+      setClosedPeriods(settings.closedPeriods)
     }
   }, [settings])
 
@@ -287,21 +292,29 @@ export default function AvailabilityPage() {
                         <div className="font-medium">{shift.label}</div>
                         <div className="text-sm text-muted-foreground">{shift.time}</div>
                       </td>
-                      {weekDates.map((date) => (
-                        <td
-                          key={date.toISOString()}
-                          className={cn(
-                            'p-4 text-center',
-                            isWeekend(date, weekendDays) && 'bg-blue-100 dark:bg-blue-950'
-                          )}
-                        >
-                          <Checkbox
-                            checked={isSlotSelected(date, shift.value)}
-                            onCheckedChange={() => toggleSlot(date, shift.value)}
-                            className="h-6 w-6"
-                          />
-                        </td>
-                      ))}
+                      {weekDates.map((date) => {
+                        const isClosed = isShiftClosed(date, shift.value, closedPeriods)
+                        return (
+                          <td
+                            key={date.toISOString()}
+                            className={cn(
+                              'p-4 text-center',
+                              isWeekend(date, weekendDays) && 'bg-blue-100 dark:bg-blue-950',
+                              isClosed && 'bg-muted opacity-50'
+                            )}
+                          >
+                            {isClosed ? (
+                              <div className="text-xs text-muted-foreground">סגור</div>
+                            ) : (
+                              <Checkbox
+                                checked={isSlotSelected(date, shift.value)}
+                                onCheckedChange={() => toggleSlot(date, shift.value)}
+                                className="h-6 w-6"
+                              />
+                            )}
+                          </td>
+                        )
+                      })}
                     </tr>
                   ))}
                 </tbody>

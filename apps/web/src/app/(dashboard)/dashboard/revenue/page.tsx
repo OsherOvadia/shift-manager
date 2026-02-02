@@ -539,7 +539,7 @@ export default function RevenuePage() {
                                       </Label>
                                       <Input
                                         type="number"
-                                        placeholder="0"
+                                        placeholder="הזן סכום"
                                         value={sittingRevenue[shiftKey] || ''}
                                         onChange={(e) => setSittingRevenue(prev => ({
                                           ...prev,
@@ -558,7 +558,7 @@ export default function RevenuePage() {
                                       </Label>
                                       <Input
                                         type="number"
-                                        placeholder="0"
+                                        placeholder="הזן סכום"
                                         value={takeawayRevenue[shiftKey] || ''}
                                         onChange={(e) => setTakeawayRevenue(prev => ({
                                           ...prev,
@@ -577,7 +577,7 @@ export default function RevenuePage() {
                                       </Label>
                                       <Input
                                         type="number"
-                                        placeholder="0"
+                                        placeholder="הזן סכום"
                                         value={deliveryRevenue[shiftKey] || ''}
                                         onChange={(e) => setDeliveryRevenue(prev => ({
                                           ...prev,
@@ -596,7 +596,7 @@ export default function RevenuePage() {
                                       </Label>
                                       <Input
                                         type="number"
-                                        placeholder="0"
+                                        placeholder="הזן סכום"
                                         value={tips[shiftKey] || ''}
                                         onChange={(e) => setTips(prev => ({
                                           ...prev,

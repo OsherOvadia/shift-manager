@@ -22,9 +22,8 @@ export class AssignmentsService {
       throw new NotFoundException('לוח המשמרות לא נמצא');
     }
 
-    if (schedule.status === 'PUBLISHED') {
-      throw new BadRequestException('לא ניתן להוסיף משמרות ללוח שפורסם');
-    }
+    // Note: Allow adding assignments even to published schedules
+    // Will notify the user if schedule is published
 
     // Verify user exists and belongs to organization
     const user = await this.prisma.user.findFirst({
@@ -92,6 +91,16 @@ export class AssignmentsService {
         shiftTemplate: true,
       },
     });
+
+    // If schedule is published, notify the user about the new assignment
+    if (schedule.status === 'PUBLISHED') {
+      await this.notificationsService.create(
+        createDto.userId,
+        'משמרת חדשה נוספה',
+        'נוספה לך משמרת חדשה. בדוק את לוח המשמרות.',
+        'SHIFT_ADDED',
+      );
+    }
 
     return assignment;
   }
@@ -191,13 +200,24 @@ export class AssignmentsService {
       throw new NotFoundException('השיבוץ לא נמצא');
     }
 
-    if (assignment.schedule.status === 'PUBLISHED') {
-      throw new BadRequestException('לא ניתן למחוק שיבוץ מלוח שפורסם');
-    }
+    // Note: Allow deleting assignments even from published schedules
+    // Will notify the user if schedule is published
+    const isPublished = assignment.schedule.status === 'PUBLISHED';
+    const userId = assignment.userId;
 
     await this.prisma.shiftAssignment.delete({
       where: { id },
     });
+
+    // If schedule was published, notify the user about the removed assignment
+    if (isPublished) {
+      await this.notificationsService.create(
+        userId,
+        'משמרת בוטלה',
+        'אחת המשמרות שלך בוטלה. בדוק את לוח המשמרות.',
+        'SHIFT_CANCELLED',
+      );
+    }
 
     return { message: 'השיבוץ נמחק בהצלחה' };
   }
