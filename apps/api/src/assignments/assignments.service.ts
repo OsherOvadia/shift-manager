@@ -98,7 +98,7 @@ export class AssignmentsService {
         createDto.userId,
         'משמרת חדשה נוספה',
         'נוספה לך משמרת חדשה. בדוק את לוח המשמרות.',
-        'SHIFT_ADDED',
+        'SHIFT_CHANGED',
       );
     }
 
@@ -215,7 +215,7 @@ export class AssignmentsService {
         userId,
         'משמרת בוטלה',
         'אחת המשמרות שלך בוטלה. בדוק את לוח המשמרות.',
-        'SHIFT_CANCELLED',
+        'SHIFT_CHANGED',
       );
     }
 
