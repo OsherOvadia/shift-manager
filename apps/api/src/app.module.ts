@@ -14,6 +14,7 @@ import { JobCategoriesModule } from './job-categories/job-categories.module';
 import { ReportsModule } from './reports/reports.module';
 import { DailyRevenuesModule } from './daily-revenues/daily-revenues.module';
 import { DatabaseResetModule } from './database/database-reset.module';
+import { CookPayrollModule } from './cook-payroll/cook-payroll.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { DatabaseResetModule } from './database/database-reset.module';
     ReportsModule,
     DailyRevenuesModule,
     DatabaseResetModule,
+    CookPayrollModule,
   ],
 })
 export class AppModule {}

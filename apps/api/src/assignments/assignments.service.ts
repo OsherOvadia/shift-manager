@@ -139,6 +139,21 @@ export class AssignmentsService {
       updateData.deliveryTips = updateDto.deliveryTips;
     }
 
+    // Handle actual time fields
+    if (updateDto.actualStartTime !== undefined) {
+      updateData.actualStartTime = updateDto.actualStartTime;
+    }
+    if (updateDto.actualEndTime !== undefined) {
+      updateData.actualEndTime = updateDto.actualEndTime;
+    }
+    
+    // Calculate actual hours if both times are provided, or use manual override
+    if (typeof updateDto.actualHours === 'number') {
+      updateData.actualHours = updateDto.actualHours;
+    } else if (updateDto.actualStartTime && updateDto.actualEndTime) {
+      updateData.actualHours = this.calculateHoursFromTimes(updateDto.actualStartTime, updateDto.actualEndTime);
+    }
+
     console.log('Update data to save:', JSON.stringify(updateData, null, 2));
     console.log('UpdateDto values:', {
       tipsEarned: updateDto.tipsEarned,
@@ -337,5 +352,24 @@ export class AssignmentsService {
     
     // Create date in local timezone (month is 0-indexed in JavaScript)
     return new Date(year, month - 1, day);
+  }
+
+  /**
+   * Calculate hours between two time strings (HH:MM format)
+   * Handles overnight shifts (e.g., 18:00 to 00:00)
+   */
+  private calculateHoursFromTimes(startTime: string, endTime: string): number {
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime.split(':').map(Number);
+    
+    let hours = (endHour + endMin / 60) - (startHour + startMin / 60);
+    
+    // Handle overnight shifts
+    if (hours < 0) {
+      hours += 24;
+    }
+    
+    // Round to 2 decimal places
+    return Math.round(hours * 100) / 100;
   }
 }

@@ -28,6 +28,7 @@ import {
   UserPlus,
   Briefcase,
   X,
+  ChefHat,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -41,8 +42,9 @@ const navigation = [
   { name: 'עובדים', href: '/dashboard/employees', icon: Users, roles: ['ADMIN', 'MANAGER'], mobileOrder: 5, color: 'bg-green-500', textColor: 'text-green-600' },
   { name: 'בקשות הרשמה', href: '/dashboard/pending-users', icon: UserPlus, roles: ['ADMIN', 'MANAGER'], mobileOrder: 6, color: 'bg-amber-500', textColor: 'text-amber-600' },
   { name: 'קטגוריות', href: '/dashboard/job-categories', icon: Briefcase, roles: ['ADMIN', 'MANAGER'], mobileOrder: 7, color: 'bg-orange-500', textColor: 'text-orange-600' },
-  { name: 'דוחות עלויות', href: '/dashboard/reports', icon: DollarSign, roles: ['ADMIN', 'MANAGER'], mobileOrder: 8, color: 'bg-emerald-500', textColor: 'text-emerald-600' },
-  { name: 'הגדרות', href: '/dashboard/settings', icon: Settings, roles: ['ADMIN'], mobileOrder: 9, color: 'bg-slate-500', textColor: 'text-slate-600' },
+  { name: 'שכר טבחים', href: '/dashboard/cook-payroll', icon: ChefHat, roles: ['ADMIN', 'MANAGER'], mobileOrder: 8, color: 'bg-red-500', textColor: 'text-red-600' },
+  { name: 'דוחות עלויות', href: '/dashboard/reports', icon: DollarSign, roles: ['ADMIN', 'MANAGER'], mobileOrder: 9, color: 'bg-emerald-500', textColor: 'text-emerald-600' },
+  { name: 'הגדרות', href: '/dashboard/settings', icon: Settings, roles: ['ADMIN'], mobileOrder: 10, color: 'bg-slate-500', textColor: 'text-slate-600' },
 ]
 
 export default function DashboardLayout({

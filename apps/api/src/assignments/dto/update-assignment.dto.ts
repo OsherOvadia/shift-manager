@@ -1,4 +1,4 @@
-import { IsIn, IsNumber, IsOptional, Min } from 'class-validator';
+import { IsIn, IsNumber, IsOptional, Min, IsString, Matches } from 'class-validator';
 
 export class UpdateAssignmentDto {
   @IsIn(['PENDING', 'CONFIRMED', 'CANCELLED'])
@@ -24,4 +24,19 @@ export class UpdateAssignmentDto {
   @Min(0)
   @IsOptional()
   deliveryTips?: number;
+
+  @IsString()
+  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: 'actualStartTime must be in HH:MM format' })
+  @IsOptional()
+  actualStartTime?: string;
+
+  @IsString()
+  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: 'actualEndTime must be in HH:MM format' })
+  @IsOptional()
+  actualEndTime?: string;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  actualHours?: number;
 }

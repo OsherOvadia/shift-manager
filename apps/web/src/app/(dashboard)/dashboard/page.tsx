@@ -44,6 +44,13 @@ export default function DashboardPage() {
     enabled: !!accessToken && !!user && !isManagerRole,
   })
 
+  // Fetch worker hours summary (only for employees, not managers/admins)
+  const { data: hoursSummary } = useQuery({
+    queryKey: ['worker-hours-summary'],
+    queryFn: () => api.get('/reports/worker-hours-summary', accessToken!),
+    enabled: !!accessToken && !!user && !isManagerRole,
+  })
+
   // Fetch employees (for managers)
   const { data: employees } = useQuery({
     queryKey: ['employees'],
@@ -153,6 +160,40 @@ export default function DashboardPage() {
                        availabilityStatus === 'PENDING' ? 'הזמינות שלך ממתינה לאישור' :
                        availabilityStatus === 'REJECTED' ? 'יש לעדכן את הזמינות' :
                        'יש להגיש זמינות לשבוע הבא'}
+                    </p>
+                  </CardContent>
+                </Card>
+              </StaggerItem>
+
+              <StaggerItem>
+                <Card className="h-full">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-2">
+                    <CardTitle className="text-xs sm:text-sm font-medium leading-tight">שעות השבוע</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                  </CardHeader>
+                  <CardContent className="p-3 sm:p-4 pt-0">
+                    <div className="text-xl sm:text-2xl font-bold text-emerald-600">
+                      {hoursSummary?.weeklyHours || 0}
+                    </div>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
+                      שעות עבודה השבוע
+                    </p>
+                  </CardContent>
+                </Card>
+              </StaggerItem>
+
+              <StaggerItem>
+                <Card className="h-full">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-2">
+                    <CardTitle className="text-xs sm:text-sm font-medium leading-tight">שעות החודש</CardTitle>
+                    <DollarSign className="h-4 w-4 text-purple-500 flex-shrink-0" />
+                  </CardHeader>
+                  <CardContent className="p-3 sm:p-4 pt-0">
+                    <div className="text-xl sm:text-2xl font-bold text-purple-600">
+                      {hoursSummary?.monthlyHours || 0}
+                    </div>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
+                      שעות עבודה החודש
                     </p>
                   </CardContent>
                 </Card>

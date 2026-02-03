@@ -67,6 +67,7 @@ model Organization {
   weeklySchedules  WeeklySchedule[]
   businessSettings BusinessSettings?
   jobCategories    JobCategory[]
+  cookWeeklyHours  CookWeeklyHours[]
 
   @@map("organizations")
 }
@@ -125,6 +126,7 @@ model User {
   shiftAssignments        ShiftAssignment[]
   notifications           Notification[]
   createdSchedules        WeeklySchedule[]
+  cookWeeklyHours         CookWeeklyHours[]
 
   @@index([organizationId])
   @@index([email])
@@ -211,6 +213,9 @@ model ShiftAssignment {
   sittingTips     Float?           @default(0) @map("sitting_tips") // Tips from dine-in
   takeawayTips    Float?           @default(0) @map("takeaway_tips") // Tips from takeaway
   deliveryTips    Float?           @default(0) @map("delivery_tips") // Tips from delivery
+  actualStartTime String?          @map("actual_start_time") // "HH:MM" format - actual clock-in
+  actualEndTime   String?          @map("actual_end_time") // "HH:MM" format - actual clock-out
+  actualHours     Float?           @map("actual_hours") // Calculated or manual override
   createdAt       DateTime         @default(now()) @map("created_at")
 
   schedule      WeeklySchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
@@ -268,4 +273,26 @@ model RefreshToken {
   @@index([userId])
   @@index([token])
   @@map("refresh_tokens")
+}
+
+model CookWeeklyHours {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  weekStart      DateTime @map("week_start") @db.Date
+  totalHours     Float    @map("total_hours")
+  hourlyWage     Float    @map("hourly_wage")
+  totalEarnings  Float    @map("total_earnings")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId, weekStart])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([weekStart])
+  @@map("cook_weekly_hours")
 }

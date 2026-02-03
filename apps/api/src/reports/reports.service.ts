@@ -55,8 +55,17 @@ export class ReportsService {
       },
     });
 
-    // Calculate hours for each shift
-    const calculateHours = (startTime: string, endTime: string): number => {
+    // Calculate hours for each shift - use actual times if available
+    const calculateHours = (assignment: any): number => {
+      // If actual hours were manually entered, use those
+      if (assignment.actualHours !== null && assignment.actualHours !== undefined) {
+        return assignment.actualHours;
+      }
+      
+      // If actual start/end times are available, calculate from those
+      const startTime = assignment.actualStartTime || assignment.shiftTemplate.startTime;
+      const endTime = assignment.actualEndTime || assignment.shiftTemplate.endTime;
+      
       const [startHour, startMin] = startTime.split(':').map(Number);
       const [endHour, endMin] = endTime.split(':').map(Number);
       
@@ -80,10 +89,7 @@ export class ReportsService {
     }>();
 
     for (const assignment of assignments) {
-      const hours = calculateHours(
-        assignment.shiftTemplate.startTime,
-        assignment.shiftTemplate.endTime
-      );
+      const hours = calculateHours(assignment);
       
       let cost = 0;
       let managerPayment = 0;
@@ -194,10 +200,7 @@ export class ReportsService {
       const employeeIds = new Set<string>();
 
       for (const assignment of dayAssignments) {
-        const hours = calculateHours(
-          assignment.shiftTemplate.startTime,
-          assignment.shiftTemplate.endTime
-        );
+        const hours = calculateHours(assignment);
         totalHours += hours;
         
         // Calculate cost based on whether employee is tip-based
@@ -352,7 +355,13 @@ export class ReportsService {
       },
     });
 
-    const calculateHours = (startTime: string, endTime: string): number => {
+    // Calculate hours - use actual times if available
+    const calculateHours = (assignment: any): number => {
+      if (assignment.actualHours !== null && assignment.actualHours !== undefined) {
+        return assignment.actualHours;
+      }
+      const startTime = assignment.actualStartTime || assignment.shiftTemplate.startTime;
+      const endTime = assignment.actualEndTime || assignment.shiftTemplate.endTime;
       const [startHour, startMin] = startTime.split(':').map(Number);
       const [endHour, endMin] = endTime.split(':').map(Number);
       let hours = endHour - startHour + (endMin - startMin) / 60;
@@ -365,10 +374,7 @@ export class ReportsService {
     const employeeIds = new Set<string>();
 
     for (const assignment of assignments) {
-      const hours = calculateHours(
-        assignment.shiftTemplate.startTime,
-        assignment.shiftTemplate.endTime
-      );
+      const hours = calculateHours(assignment);
       totalHours += hours;
       totalCost += hours * assignment.user.hourlyWage;
       employeeIds.add(assignment.user.id);
@@ -381,6 +387,100 @@ export class ReportsService {
       totalCost,
       employeeCount: employeeIds.size,
       shiftCount: assignments.length,
+    };
+  }
+
+  /**
+   * Get worker hours summary (weekly and monthly)
+   */
+  async getWorkerHoursSummary(userId: string, organizationId: string) {
+    const now = new Date();
+    
+    // Get week start and end
+    const weekStart = this.normalizeToWeekStart(now);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
+
+    // Get month start and end
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    // Verify user belongs to organization
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, organizationId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('המשתמש לא נמצא');
+    }
+
+    // Get weekly assignments
+    const weeklyAssignments = await this.prisma.shiftAssignment.findMany({
+      where: {
+        userId,
+        schedule: { organizationId },
+        shiftDate: {
+          gte: weekStart,
+          lt: weekEnd,
+        },
+        status: { not: 'CANCELLED' },
+      },
+      include: {
+        shiftTemplate: {
+          select: {
+            startTime: true,
+            endTime: true,
+          },
+        },
+      },
+    });
+
+    // Get monthly assignments
+    const monthlyAssignments = await this.prisma.shiftAssignment.findMany({
+      where: {
+        userId,
+        schedule: { organizationId },
+        shiftDate: {
+          gte: monthStart,
+          lt: monthEnd,
+        },
+        status: { not: 'CANCELLED' },
+      },
+      include: {
+        shiftTemplate: {
+          select: {
+            startTime: true,
+            endTime: true,
+          },
+        },
+      },
+    });
+
+    // Calculate hours using actual times if available
+    const calculateHours = (assignment: any): number => {
+      if (assignment.actualHours !== null && assignment.actualHours !== undefined) {
+        return assignment.actualHours;
+      }
+      const startTime = assignment.actualStartTime || assignment.shiftTemplate.startTime;
+      const endTime = assignment.actualEndTime || assignment.shiftTemplate.endTime;
+      const [startHour, startMin] = startTime.split(':').map(Number);
+      const [endHour, endMin] = endTime.split(':').map(Number);
+      let hours = endHour - startHour + (endMin - startMin) / 60;
+      if (hours < 0) hours += 24;
+      return hours;
+    };
+
+    const weeklyHours = weeklyAssignments.reduce((sum, a) => sum + calculateHours(a), 0);
+    const monthlyHours = monthlyAssignments.reduce((sum, a) => sum + calculateHours(a), 0);
+
+    return {
+      userId,
+      weeklyHours: Math.round(weeklyHours * 100) / 100,
+      monthlyHours: Math.round(monthlyHours * 100) / 100,
+      weeklyShiftCount: weeklyAssignments.length,
+      monthlyShiftCount: monthlyAssignments.length,
+      weekStart: weekStart.toISOString(),
+      monthStart: monthStart.toISOString(),
     };
   }
 

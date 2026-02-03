@@ -19,7 +19,9 @@ import { useToast } from '@/components/ui/use-toast'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
 import { getWeekStartDate, getWeekDates, getDayName, getDayLetter, formatShortDate, isWeekend, formatDateLocal, isShiftClosed } from '@/lib/utils'
-import { Loader2, ChevronRight, ChevronLeft, Plus, Trash2, Send, AlertTriangle } from 'lucide-react'
+import { Loader2, ChevronRight, ChevronLeft, Plus, Trash2, Send, AlertTriangle, Clock, Edit2 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
 const SHIFT_TYPES = [
@@ -40,6 +42,10 @@ export default function ManageSchedulePage() {
   const [closedPeriods, setClosedPeriods] = useState<Array<{ day: number; shiftTypes: string[] }>>([])
   const [selectedShift, setSelectedShift] = useState<{ date: Date; shiftType: string } | null>(null)
   const [selectedWorkers, setSelectedWorkers] = useState<string[]>([])
+  const [editingAssignment, setEditingAssignment] = useState<any | null>(null)
+  const [actualStartTime, setActualStartTime] = useState('')
+  const [actualEndTime, setActualEndTime] = useState('')
+  const [actualHours, setActualHours] = useState('')
 
   // Parse week from URL or use current week  
   const urlWeek = searchParams.get('week')
@@ -219,6 +225,65 @@ export default function ManageSchedulePage() {
       })
     },
   })
+
+  // Update actual times mutation
+  const updateActualTimesMutation = useMutation({
+    mutationFn: (data: { id: string; actualStartTime?: string; actualEndTime?: string; actualHours?: number }) =>
+      api.patch(`/assignments/${data.id}`, {
+        actualStartTime: data.actualStartTime || null,
+        actualEndTime: data.actualEndTime || null,
+        actualHours: data.actualHours ? parseFloat(data.actualHours.toString()) : null,
+      }, accessToken!),
+    onSuccess: () => {
+      toast({ title: 'זמני נוכחות עודכנו' })
+      refreshScheduleData()
+      setEditingAssignment(null)
+      setActualStartTime('')
+      setActualEndTime('')
+      setActualHours('')
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'שגיאה',
+        description: error.message,
+      })
+    },
+  })
+
+  // Open edit times dialog
+  const openEditTimesDialog = (assignment: any) => {
+    setEditingAssignment(assignment)
+    setActualStartTime(assignment.actualStartTime || assignment.shiftTemplate?.startTime || '')
+    setActualEndTime(assignment.actualEndTime || assignment.shiftTemplate?.endTime || '')
+    setActualHours(assignment.actualHours?.toString() || '')
+  }
+
+  // Calculate hours from times
+  const calculateHoursFromTimes = (start: string, end: string): number => {
+    if (!start || !end) return 0
+    const [startH, startM] = start.split(':').map(Number)
+    const [endH, endM] = end.split(':').map(Number)
+    let hours = (endH + endM / 60) - (startH + startM / 60)
+    if (hours < 0) hours += 24
+    return Math.round(hours * 100) / 100
+  }
+
+  // Handle save actual times
+  const handleSaveActualTimes = () => {
+    if (!editingAssignment) return
+    
+    const hours = actualHours 
+      ? parseFloat(actualHours) 
+      : calculateHoursFromTimes(actualStartTime, actualEndTime)
+    
+    updateActualTimesMutation.mutate({
+      id: editingAssignment.id,
+      actualStartTime: actualStartTime || undefined,
+      actualEndTime: actualEndTime || undefined,
+      actualHours: hours || undefined,
+    })
+  }
 
   // Publish schedule mutation
   const publishMutation = useMutation({
@@ -493,24 +558,64 @@ export default function ManageSchedulePage() {
                               <div className="text-xs text-muted-foreground py-2">סגור</div>
                             ) : (
                               <div className="space-y-1 min-w-[180px]">
-                                {assignments.map((a: any) => (
-                                  <div
-                                    key={a.id}
-                                    className="flex items-center justify-between text-sm p-2 bg-muted rounded group"
-                                  >
-                                    <span>
-                                      {a.user.firstName} {a.user.lastName[0]}.
-                                    </span>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                                      onClick={() => deleteAssignmentMutation.mutate(a.id)}
+                                {assignments.map((a: any) => {
+                                  const hasActualTimes = a.actualStartTime || a.actualEndTime || a.actualHours
+                                  const scheduledStart = a.shiftTemplate?.startTime || ''
+                                  const scheduledEnd = a.shiftTemplate?.endTime || ''
+                                  const displayStart = a.actualStartTime || scheduledStart
+                                  const displayEnd = a.actualEndTime || scheduledEnd
+                                  const displayHours = a.actualHours || calculateHoursFromTimes(scheduledStart, scheduledEnd)
+                                  
+                                  return (
+                                    <div
+                                      key={a.id}
+                                      className="text-sm p-2 bg-muted rounded group"
                                     >
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                ))}
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-medium">
+                                          {a.user.firstName} {a.user.lastName[0]}.
+                                        </span>
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6"
+                                            onClick={() => openEditTimesDialog(a)}
+                                            title="עריכת זמנים"
+                                          >
+                                            <Clock className="h-3 w-3" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6"
+                                            onClick={() => deleteAssignmentMutation.mutate(a.id)}
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                      {hasActualTimes && (
+                                        <div className="text-xs text-muted-foreground mt-1">
+                                          <span className={cn(
+                                            a.actualStartTime && a.actualStartTime !== scheduledStart && 'text-amber-600'
+                                          )}>
+                                            {displayStart}
+                                          </span>
+                                          {' - '}
+                                          <span className={cn(
+                                            a.actualEndTime && a.actualEndTime !== scheduledEnd && 'text-amber-600'
+                                          )}>
+                                            {displayEnd}
+                                          </span>
+                                          <span className="mr-1">
+                                            ({displayHours}ש)
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })}
                                 {template && (
                                   <Button
                                     variant="outline"
@@ -692,6 +797,96 @@ export default function ManageSchedulePage() {
                 <>
                   שבץ {selectedWorkers.length} עובדים
                 </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Actual Times Dialog */}
+      <Dialog open={!!editingAssignment} onOpenChange={(open) => !open && setEditingAssignment(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              עריכת זמני נוכחות
+            </DialogTitle>
+            <DialogDescription>
+              {editingAssignment && (
+                <>
+                  {editingAssignment.user?.firstName} {editingAssignment.user?.lastName}
+                  <br />
+                  <span className="text-muted-foreground">
+                    משמרת מתוכננת: {editingAssignment.shiftTemplate?.startTime} - {editingAssignment.shiftTemplate?.endTime}
+                  </span>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>שעת כניסה בפועל</Label>
+                <Input
+                  type="time"
+                  value={actualStartTime}
+                  onChange={(e) => setActualStartTime(e.target.value)}
+                  placeholder="HH:MM"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>שעת יציאה בפועל</Label>
+                <Input
+                  type="time"
+                  value={actualEndTime}
+                  onChange={(e) => setActualEndTime(e.target.value)}
+                  placeholder="HH:MM"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>שעות בפועל (או הזנה ידנית)</Label>
+              <Input
+                type="number"
+                value={actualHours || (actualStartTime && actualEndTime 
+                  ? calculateHoursFromTimes(actualStartTime, actualEndTime).toString() 
+                  : '')}
+                onChange={(e) => setActualHours(e.target.value)}
+                placeholder="הזן מספר שעות"
+                min="0"
+                step="0.5"
+              />
+              <p className="text-xs text-muted-foreground">
+                אם מוזנות שעות כניסה ויציאה, השעות יחושבו אוטומטית. ניתן לדרוס ידנית.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditingAssignment(null)
+                setActualStartTime('')
+                setActualEndTime('')
+                setActualHours('')
+              }}
+            >
+              ביטול
+            </Button>
+            <Button
+              onClick={handleSaveActualTimes}
+              disabled={updateActualTimesMutation.isPending}
+            >
+              {updateActualTimesMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                  שומר...
+                </>
+              ) : (
+                'שמור'
               )}
             </Button>
           </DialogFooter>
