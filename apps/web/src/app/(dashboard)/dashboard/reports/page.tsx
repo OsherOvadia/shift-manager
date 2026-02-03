@@ -35,6 +35,7 @@ import {
   Coins,
   PieChart,
   BarChart3,
+  ChefHat,
 } from 'lucide-react'
 import { 
   PageTransition, 
@@ -374,6 +375,112 @@ export default function ReportsPage() {
                 </Card>
               </StaggerItem>
             </StaggerContainer>
+
+            {/* Waiter vs Cook Breakdown */}
+            {report.summary.waiterCost !== undefined && report.summary.cookCost !== undefined && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    פילוח שכר: מלצרים ומטבח
+                  </CardTitle>
+                  <CardDescription>
+                    שכר המטבח אינו מכוסה על ידי טיפים
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 border rounded-lg">
+                      <div className="text-sm text-muted-foreground mb-2">מלצרים</div>
+                      <div className="text-2xl font-bold text-blue-600 mb-1">
+                        {formatCurrency(report.summary.waiterCost)}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {report.summary.waiterHours.toFixed(1)} שעות
+                      </div>
+                    </div>
+                    <div className="p-4 border rounded-lg bg-red-50 dark:bg-red-950/30">
+                      <div className="text-sm text-muted-foreground mb-2">מטבח</div>
+                      <div className="text-2xl font-bold text-red-600 mb-1">
+                        {formatCurrency(report.summary.cookCost)}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {report.summary.cookHours.toFixed(1)} שעות
+                      </div>
+                      <div className="text-xs text-red-600 font-medium mt-1">
+                        ⚠️ לא מכוסה מטיפים
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Cook Payroll Table */}
+            {report.cookPayroll && report.cookPayroll.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ChefHat className="h-5 w-5" />
+                    שכר עובדי מטבח
+                  </CardTitle>
+                  <CardDescription>
+                    פירוט עלות שכר המטבח - שכר מלא משולם על ידי הבעלים
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-right p-2">עובד</th>
+                          <th className="text-center p-2">שעות</th>
+                          <th className="text-center p-2">שכר לשעה</th>
+                          <th className="text-center p-2">סה"כ</th>
+                          <th className="text-right p-2">הערות</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {report.cookPayroll.map((cook: any, idx: number) => (
+                          <tr key={idx} className="border-b hover:bg-muted/50">
+                            <td className="p-2">
+                              <div className="font-medium">
+                                {cook.user.firstName} {cook.user.lastName}
+                              </div>
+                              {cook.user.jobCategory && (
+                                <div className="text-xs text-muted-foreground">
+                                  {cook.user.jobCategory.nameHe || cook.user.jobCategory.name}
+                                </div>
+                              )}
+                            </td>
+                            <td className="text-center p-2">{cook.totalHours}</td>
+                            <td className="text-center p-2">{formatCurrency(cook.hourlyWage)}</td>
+                            <td className="text-center p-2 font-bold text-red-600">
+                              {formatCurrency(cook.totalCost)}
+                            </td>
+                            <td className="text-right p-2 text-sm text-muted-foreground">
+                              {cook.notes || '-'}
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="font-bold bg-red-50 dark:bg-red-950/30">
+                          <td className="p-2">סה"כ מטבח</td>
+                          <td className="text-center p-2">
+                            {report.summary.cookHours.toFixed(1)}
+                          </td>
+                          <td className="text-center p-2">-</td>
+                          <td className="text-center p-2 text-red-600">
+                            {formatCurrency(report.summary.cookCost)}
+                          </td>
+                          <td className="p-2"></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </StaggerContainer>
 
             {/* Week vs Week Comparison */}
             {prevWeekReport && (

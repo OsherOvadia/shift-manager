@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, MaxLength } from 'class-validator';
+import { IsEmail, IsString, MinLength, MaxLength, IsOptional, IsNumber } from 'class-validator';
 
 export class SignupRequestDto {
   @IsEmail({}, { message: 'כתובת אימייל לא תקינה' })
@@ -23,4 +23,13 @@ export class SignupRequestDto {
   @MinLength(2, { message: 'שם הארגון חייב להכיל לפחות 2 תווים' })
   @MaxLength(100)
   organizationName: string;
+
+  // Optional fields that will be ignored during signup
+  @IsOptional()
+  @IsString()
+  jobCategoryId?: string;
+
+  @IsOptional()
+  @IsNumber()
+  hourlyWage?: number;
 }

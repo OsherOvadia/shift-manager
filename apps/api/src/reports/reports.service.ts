@@ -14,6 +14,31 @@ export class ReportsService {
     const endDate = new Date(startDate);
     endDate.setUTCDate(endDate.getUTCDate() + 7);
 
+    // Get cook payroll for the week
+    const cookPayroll = await this.prisma.cookWeeklyHours.findMany({
+      where: {
+        organizationId,
+        weekStart: startDate,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            jobCategory: {
+              select: {
+                id: true,
+                name: true,
+                nameHe: true,
+                color: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
     // Get all shift assignments for the week
     const assignments = await this.prisma.shiftAssignment.findMany({
       where: {
@@ -303,24 +328,46 @@ export class ReportsService {
       };
     });
 
-    const overallProfitMargin = totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0;
-    const overallSalaryPercentage = totalRevenue > 0 ? (totalCost / totalRevenue) * 100 : 0;
+    // Add cook payroll costs (cooks are NOT tip-based, full salary paid by owner)
+    const cookCosts = cookPayroll.map(cook => ({
+      user: cook.user,
+      totalHours: cook.totalHours,
+      totalCost: cook.totalEarnings, // Full earnings paid by owner
+      hourlyWage: cook.hourlyWage,
+      notes: cook.notes,
+    }));
+
+    const totalCookHours = cookPayroll.reduce((sum, c) => sum + c.totalHours, 0);
+    const totalCookCost = cookPayroll.reduce((sum, c) => sum + c.totalEarnings, 0);
+
+    // Add cook costs to total cost (waiters' tips CANNOT pay for cook salaries)
+    const totalCostWithCooks = totalCost + totalCookCost;
+    const totalHoursWithCooks = totalHours + totalCookHours;
+
+    const overallProfitMargin = totalRevenue > 0 ? ((totalRevenue - totalCostWithCooks) / totalRevenue) * 100 : 0;
+    const overallSalaryPercentage = totalRevenue > 0 ? (totalCostWithCooks / totalRevenue) * 100 : 0;
 
     return {
       weekStartDate: startDate,
       summary: {
-        totalHours,
-        totalCost,
+        totalHours: totalHoursWithCooks,
+        totalCost: totalCostWithCooks,
         totalTips,
         totalRevenue,
         profitMargin: overallProfitMargin,
         salaryPercentage: overallSalaryPercentage,
-        employeeCount: employeeCosts.size,
+        employeeCount: employeeCosts.size + cookPayroll.length,
         shiftCount: assignments.length,
+        // Separate breakdown
+        waiterHours: totalHours,
+        waiterCost: totalCost,
+        cookHours: totalCookHours,
+        cookCost: totalCookCost,
       },
       byEmployee: Array.from(employeeCosts.values()).sort((a, b) => b.totalCost - a.totalCost),
       byCategory: Array.from(categoryCosts.values()).sort((a, b) => b.totalCost - a.totalCost),
       byDay: dailyCostsWithRevenue,
+      cookPayroll: cookCosts.sort((a, b) => b.totalCost - a.totalCost),
     };
   }
 
