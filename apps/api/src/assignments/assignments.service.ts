@@ -101,7 +101,7 @@ export class AssignmentsService {
         'SHIFT_CHANGED',
       );
     }
-
+ 
     return assignment;
   }
 
