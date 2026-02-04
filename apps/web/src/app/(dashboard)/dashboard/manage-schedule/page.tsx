@@ -384,6 +384,7 @@ export default function ManageSchedulePage() {
   }, [availabilitySubmissions])
 
   // Get employees sorted by availability for a specific date/shift
+  // Filter out chefs, sushimen, and other kitchen staff - only show waiters
   const getEmployeesForShift = (date: Date, shiftType: string) => {
     if (!employees) return []
     
@@ -391,8 +392,18 @@ export default function ManageSchedulePage() {
     const key = `${dateStr}_${shiftType}`
     const employeesWithAvailability = availabilityMap.get(key) || new Set()
 
+    // Filter out kitchen staff (cooks, chefs, sushimen)
+    const kitchenCategories = ['cook', 'טבח', 'chef', 'sushiman', 'סושימן', 'kitchen', 'מטבח']
+    const waitersOnly = employees.filter(emp => {
+      const categoryName = emp.jobCategory?.name?.toLowerCase() || ''
+      const categoryNameHe = emp.jobCategory?.nameHe?.toLowerCase() || ''
+      return !kitchenCategories.some(kitchen => 
+        categoryName.includes(kitchen) || categoryNameHe.includes(kitchen)
+      )
+    })
+
     // Sort: employees with availability first, then others
-    return [...employees].sort((a, b) => {
+    return [...waitersOnly].sort((a, b) => {
       const aHasAvailability = employeesWithAvailability.has(a.id)
       const bHasAvailability = employeesWithAvailability.has(b.id)
       

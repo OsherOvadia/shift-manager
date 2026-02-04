@@ -219,12 +219,12 @@ export class UsersService {
       throw new ForbiddenException('לא ניתן לבטל את עצמך');
     }
 
-    await this.prisma.user.update({
+    // Hard delete the user from the database
+    await this.prisma.user.delete({
       where: { id },
-      data: { isActive: false },
     });
 
-    return { message: 'המשתמש בוטל בהצלחה' };
+    return { message: 'המשתמש נמחק בהצלחה' };
   }
 
   async getActiveEmployees(organizationId: string) {

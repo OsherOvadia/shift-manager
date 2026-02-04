@@ -333,12 +333,43 @@ export class ReportsService {
       user: cook.user,
       totalHours: cook.totalHours,
       totalCost: cook.totalEarnings, // Full earnings paid by owner
+      totalTips: 0, // Cooks don't receive tips
+      managerPayment: cook.totalEarnings, // Full payment by owner
+      tipsCoverSalary: false,
+      baseWageTotal: cook.totalEarnings,
+      totalWorkerPayment: cook.totalEarnings,
       hourlyWage: cook.hourlyWage,
       notes: cook.notes,
+      shifts: [], // Cooks don't have shift assignments
     }));
 
     const totalCookHours = cookPayroll.reduce((sum, c) => sum + c.totalHours, 0);
     const totalCookCost = cookPayroll.reduce((sum, c) => sum + c.totalEarnings, 0);
+
+    // Add cooks to byEmployee array
+    const allEmployees = [
+      ...Array.from(employeeCosts.values()),
+      ...cookCosts,
+    ].sort((a, b) => b.totalCost - a.totalCost);
+
+    // Add cooks to byCategory
+    for (const cook of cookPayroll) {
+      const categoryId = cook.user.jobCategory?.id || 'uncategorized';
+      
+      if (!categoryCosts.has(categoryId)) {
+        categoryCosts.set(categoryId, {
+          category: cook.user.jobCategory || { id: 'uncategorized', name: 'Uncategorized', nameHe: 'ללא קטגוריה', color: '#6b7280' },
+          totalHours: 0,
+          totalCost: 0,
+          employeeCount: 0,
+        });
+      }
+
+      const catRecord = categoryCosts.get(categoryId)!;
+      catRecord.totalHours += cook.totalHours;
+      catRecord.totalCost += cook.totalEarnings;
+      catRecord.employeeCount += 1;
+    }
 
     // Add cook costs to total cost (waiters' tips CANNOT pay for cook salaries)
     const totalCostWithCooks = totalCost + totalCookCost;
@@ -364,7 +395,7 @@ export class ReportsService {
         cookHours: totalCookHours,
         cookCost: totalCookCost,
       },
-      byEmployee: Array.from(employeeCosts.values()).sort((a, b) => b.totalCost - a.totalCost),
+      byEmployee: allEmployees,
       byCategory: Array.from(categoryCosts.values()).sort((a, b) => b.totalCost - a.totalCost),
       byDay: dailyCostsWithRevenue,
       cookPayroll: cookCosts.sort((a, b) => b.totalCost - a.totalCost),
