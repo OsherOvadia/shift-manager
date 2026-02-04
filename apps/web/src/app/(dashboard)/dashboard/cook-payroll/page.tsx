@@ -69,6 +69,9 @@ export default function CookPayrollPage() {
   const [editedHours, setEditedHours] = useState<{ [key: string]: string }>({})
   const [editedWages, setEditedWages] = useState<{ [key: string]: string }>({})
   const [editedNotes, setEditedNotes] = useState<{ [key: string]: string }>({})
+  const [savedHours, setSavedHours] = useState<{ [key: string]: string }>({})
+  const [savedWages, setSavedWages] = useState<{ [key: string]: string }>({})
+  const [savedNotes, setSavedNotes] = useState<{ [key: string]: string }>({})
   const [savingUserId, setSavingUserId] = useState<string | null>(null)
   const { toast } = useToast()
   const queryClient = useQueryClient()
@@ -112,6 +115,11 @@ export default function CookPayrollPage() {
       setEditedHours(hours)
       setEditedWages(wages)
       setEditedNotes(notes)
+      
+      // Also set saved values (initial state)
+      setSavedHours(hours)
+      setSavedWages(wages)
+      setSavedNotes(notes)
     }
   }, [payrollData])
 
@@ -119,13 +127,19 @@ export default function CookPayrollPage() {
   const saveCookHoursMutation = useMutation({
     mutationFn: (data: { userId: string; weekStart: string; totalHours: number; hourlyWage: number; notes?: string }) =>
       api.post('/cook-payroll', data, accessToken!),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast({
         title: 'נשמר בהצלחה',
         description: 'שעות העבודה נשמרו',
       })
       queryClient.invalidateQueries({ queryKey: ['cook-payroll'] })
       queryClient.invalidateQueries({ queryKey: ['cook-payroll-comparison'] })
+      
+      // Update saved state to match current edited state
+      setSavedHours(prev => ({ ...prev, [variables.userId]: editedHours[variables.userId] }))
+      setSavedWages(prev => ({ ...prev, [variables.userId]: editedWages[variables.userId] }))
+      setSavedNotes(prev => ({ ...prev, [variables.userId]: editedNotes[variables.userId] }))
+      
       setSavingUserId(null)
     },
     onError: (error: any) => {
@@ -181,6 +195,15 @@ export default function CookPayrollPage() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount)
+  }
+
+  // Check if cook data has been modified since last save
+  const hasUnsavedChanges = (userId: string): boolean => {
+    return (
+      editedHours[userId] !== savedHours[userId] ||
+      editedWages[userId] !== savedWages[userId] ||
+      editedNotes[userId] !== savedNotes[userId]
+    )
   }
 
   if (!isAdminOrManager) {
@@ -374,21 +397,23 @@ export default function CookPayrollPage() {
                       </div>
                     </div>
 
-                    {/* Save Button */}
-                    <div className="flex justify-end">
-                      <Button
-                        size="sm"
-                        onClick={() => handleSaveCook(cook.userId)}
-                        disabled={savingUserId === cook.userId}
-                      >
-                        {savingUserId === cook.userId ? (
-                          <Loader2 className="h-4 w-4 animate-spin ml-2" />
-                        ) : (
-                          <Save className="h-4 w-4 ml-2" />
-                        )}
-                        שמור
-                      </Button>
-                    </div>
+                    {/* Save Button - Only show if there are unsaved changes */}
+                    {hasUnsavedChanges(cook.userId) && (
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          onClick={() => handleSaveCook(cook.userId)}
+                          disabled={savingUserId === cook.userId}
+                        >
+                          {savingUserId === cook.userId ? (
+                            <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                          ) : (
+                            <Save className="h-4 w-4 ml-2" />
+                          )}
+                          שמור
+                        </Button>
+                      </div>
+                    )}
                   </motion.div>
                 ))}
               </div>
