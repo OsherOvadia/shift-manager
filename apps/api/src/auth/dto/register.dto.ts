@@ -1,4 +1,4 @@
-import { IsEmail, IsString, IsIn, MinLength, MaxLength } from 'class-validator';
+import { IsEmail, IsString, IsIn, MinLength, MaxLength, IsOptional, IsUUID, IsNumber, Min, IsBoolean } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail({}, { message: 'כתובת אימייל לא תקינה' })
@@ -24,4 +24,22 @@ export class RegisterDto {
 
   @IsIn(['FULL_TIME', 'PART_TIME'], { message: 'סוג העסקה לא תקין' })
   employmentType: string;
+
+  @IsOptional()
+  @IsUUID('4')
+  jobCategoryId?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  hourlyWage?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  baseHourlyWage?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isTipBased?: boolean;
 }

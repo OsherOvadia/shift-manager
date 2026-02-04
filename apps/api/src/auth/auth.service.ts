@@ -136,7 +136,7 @@ export class AuthService {
     };
   }
 
-  async register(registerDto: RegisterDto & { jobCategoryId?: string; hourlyWage?: number }, creatorId: string) {
+  async register(registerDto: RegisterDto, creatorId: string) {
     const creator = await this.prisma.user.findUnique({
       where: { id: creatorId },
     });
@@ -166,8 +166,10 @@ export class AuthService {
         role: registerDto.role as any,
         employmentType: registerDto.employmentType as any,
         organizationId: creator.organizationId,
-        jobCategoryId: registerDto.jobCategoryId,
+        jobCategoryId: registerDto.jobCategoryId || null,
         hourlyWage: registerDto.hourlyWage || 0,
+        baseHourlyWage: registerDto.baseHourlyWage || null,
+        isTipBased: registerDto.isTipBased || false,
         isApproved: true, // Created by admin/manager = auto-approved
       },
       include: { organization: true, jobCategory: true },
