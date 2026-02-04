@@ -10,6 +10,7 @@ async function bootstrap() {
     'http://localhost:3000',
     'https://web-sigma-woad-44.vercel.app',
     'https://shift-manager-ebg7uwqdj-oshioshiges-projects.vercel.app',
+    'https://shift-manager-pro.vercel.app',
   ];
   
   if (process.env.FRONTEND_URL) {
