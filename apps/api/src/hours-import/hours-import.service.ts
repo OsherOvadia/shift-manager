@@ -665,28 +665,8 @@ export class HoursImportService {
         };
       }
 
-      // Try partial/contains match
-      const partialMatches = users.filter(u => {
-        const firstName = u.firstName.trim().toLowerCase();
-        const lastName = u.lastName.trim().toLowerCase();
-        const workerName = worker.name.trim().toLowerCase();
-        return firstName.includes(workerName) ||
-               lastName.includes(workerName) ||
-               workerName.includes(firstName) ||
-               workerName.includes(lastName);
-      });
-
-      if (partialMatches.length === 1) {
-        return {
-          ...worker,
-          matchedUserId: partialMatches[0].id,
-          matchedUserName: `${partialMatches[0].firstName} ${partialMatches[0].lastName}`,
-          matchStatus: 'partial' as const,
-          matchCandidates: [],
-        };
-      }
-
-      // Unmatched - provide candidates for manual selection
+      // No exact match found - mark as unmatched
+      // Provide all users as candidates for manual selection
       const candidates = users.map(u => ({
         id: u.id,
         name: `${u.firstName} ${u.lastName}`,
@@ -694,8 +674,8 @@ export class HoursImportService {
 
       return {
         ...worker,
-        matchedUserId: partialMatches.length > 0 ? partialMatches[0].id : null,
-        matchedUserName: partialMatches.length > 0 ? `${partialMatches[0].firstName} ${partialMatches[0].lastName}` : null,
+        matchedUserId: null,
+        matchedUserName: null,
         matchStatus: 'unmatched' as const,
         matchCandidates: candidates,
       };
