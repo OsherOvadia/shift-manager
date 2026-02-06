@@ -17,8 +17,9 @@ class ApiError extends Error {
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const { token, skipAuth, ...fetchOptions } = options
 
+  const isFormData = options.body instanceof FormData
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...options.headers,
   }
 
@@ -84,6 +85,14 @@ export const api = {
 
   delete: <T>(endpoint: string, token?: string) =>
     request<T>(endpoint, { method: 'DELETE', token }),
+
+  upload: <T>(endpoint: string, formData: FormData, token?: string) =>
+    request<T>(endpoint, {
+      method: 'POST',
+      body: formData,
+      token,
+      headers: {}, // Let browser set Content-Type with boundary for multipart
+    }),
 
   // For unauthenticated requests (login, signup, etc.)
   public: {

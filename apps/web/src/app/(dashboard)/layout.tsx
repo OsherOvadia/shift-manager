@@ -29,6 +29,7 @@ import {
   Briefcase,
   X,
   ChefHat,
+  Upload,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -44,7 +45,8 @@ const navigation = [
   { name: 'קטגוריות', href: '/dashboard/job-categories', icon: Briefcase, roles: ['ADMIN', 'MANAGER'], mobileOrder: 7, color: 'bg-orange-500', textColor: 'text-orange-600' },
   { name: 'שכר טבחים', href: '/dashboard/cook-payroll', icon: ChefHat, roles: ['ADMIN', 'MANAGER'], mobileOrder: 8, color: 'bg-red-500', textColor: 'text-red-600' },
   { name: 'דוחות עלויות', href: '/dashboard/reports', icon: DollarSign, roles: ['ADMIN', 'MANAGER'], mobileOrder: 9, color: 'bg-emerald-500', textColor: 'text-emerald-600' },
-  { name: 'הגדרות', href: '/dashboard/settings', icon: Settings, roles: ['ADMIN'], mobileOrder: 10, color: 'bg-slate-500', textColor: 'text-slate-600' },
+  { name: 'העלאת שעות', href: '/dashboard/import-hours', icon: Upload, roles: ['ADMIN', 'MANAGER'], mobileOrder: 10, color: 'bg-indigo-500', textColor: 'text-indigo-600' },
+  { name: 'הגדרות', href: '/dashboard/settings', icon: Settings, roles: ['ADMIN'], mobileOrder: 11, color: 'bg-slate-500', textColor: 'text-slate-600' },
 ]
 
 export default function DashboardLayout({
