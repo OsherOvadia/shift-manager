@@ -8,6 +8,11 @@ export class UpdateAssignmentDto {
   @IsNumber()
   @Min(0)
   @IsOptional()
+  cashTips?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
   tipsEarned?: number;
 
   @IsNumber()

@@ -37,4 +37,23 @@ export class ReportsController {
   getWorkerHoursSummary(@Request() req: any) {
     return this.reportsService.getWorkerHoursSummary(req.user.sub, req.user.organizationId);
   }
+
+  /**
+   * Get employee monthly cash tips - accessible by the employee themselves
+   */
+  @Get('employee-monthly-cash-tips')
+  getEmployeeMonthlyCashTips(
+    @Query('year') year: string,
+    @Query('month') month: string,
+    @Request() req: any,
+  ) {
+    const y = year ? parseInt(year, 10) : new Date().getFullYear();
+    const m = month ? parseInt(month, 10) : new Date().getMonth() + 1;
+    return this.reportsService.getEmployeeMonthlyCashTips(
+      req.user.sub,
+      req.user.organizationId,
+      y,
+      m,
+    );
+  }
 }

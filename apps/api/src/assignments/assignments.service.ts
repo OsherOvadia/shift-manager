@@ -126,6 +126,9 @@ export class AssignmentsService {
     if (updateDto.status !== undefined) updateData.status = updateDto.status as any;
     
     // Always set numeric fields if they are provided (including 0)
+    if (typeof updateDto.cashTips === 'number') {
+      updateData.cashTips = updateDto.cashTips;
+    }
     if (typeof updateDto.tipsEarned === 'number') {
       updateData.tipsEarned = updateDto.tipsEarned;
     }
@@ -182,6 +185,7 @@ export class AssignmentsService {
     const verifyAssignment = await this.prisma.shiftAssignment.findUnique({
       where: { id },
       select: {
+        cashTips: true,
         sittingTips: true,
         takeawayTips: true,
         deliveryTips: true,

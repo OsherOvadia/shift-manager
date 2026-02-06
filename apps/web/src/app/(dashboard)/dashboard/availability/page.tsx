@@ -93,12 +93,19 @@ export default function AvailabilityPage() {
         weekStartDate: targetWeekStart.toISOString(),
         slots,
       }, accessToken!),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({
         title: 'הזמינות נשמרה בהצלחה',
         description: 'הזמינות שלך הוגשה לאישור המנהל',
       })
-      queryClient.invalidateQueries({ queryKey: ['availability'] })
+      // Invalidate and refetch all availability-related queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['availability'] }),
+        queryClient.invalidateQueries({ queryKey: ['my-availability'] }),
+        queryClient.invalidateQueries({ queryKey: ['all-availability'] }),
+      ])
+      // Force immediate refetch of current query
+      queryClient.refetchQueries({ queryKey: ['availability', targetWeekStart.toISOString()] })
     },
     onError: (error: any) => {
       const violations = error.data?.violations

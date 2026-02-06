@@ -19,6 +19,7 @@ import {
   Briefcase,
   DollarSign,
   TrendingUp,
+  Coins,
 } from 'lucide-react'
 import { PageTransition, StaggerContainer, StaggerItem, motion } from '@/components/ui/animations'
 
@@ -48,6 +49,15 @@ export default function DashboardPage() {
   const { data: hoursSummary } = useQuery({
     queryKey: ['worker-hours-summary'],
     queryFn: () => api.get('/reports/worker-hours-summary', accessToken!),
+    enabled: !!accessToken && !!user && !isManagerRole,
+  })
+
+  // Fetch employee monthly cash tips (only for employees, not managers/admins)
+  const currentYear = new Date().getFullYear()
+  const currentMonth = new Date().getMonth() + 1
+  const { data: monthlyCashTips } = useQuery({
+    queryKey: ['employee-monthly-cash-tips', currentYear, currentMonth],
+    queryFn: () => api.get(`/reports/employee-monthly-cash-tips?year=${currentYear}&month=${currentMonth}`, accessToken!),
     enabled: !!accessToken && !!user && !isManagerRole,
   })
 
@@ -113,7 +123,7 @@ export default function DashboardPage() {
         </motion.div>
 
         {/* Quick Stats */}
-        <StaggerContainer className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StaggerContainer className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
           {!isManagerRole && (
             <>
               <StaggerItem>
@@ -194,6 +204,23 @@ export default function DashboardPage() {
                     </div>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">
                       שעות עבודה החודש
+                    </p>
+                  </CardContent>
+                </Card>
+              </StaggerItem>
+
+              <StaggerItem>
+                <Card className="h-full bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border-amber-200 dark:border-amber-800">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-2">
+                    <CardTitle className="text-xs sm:text-sm font-medium leading-tight text-amber-700 dark:text-amber-400">טיפים מזומן חודשי</CardTitle>
+                    <Coins className="h-4 w-4 text-amber-600 dark:text-amber-500 flex-shrink-0" />
+                  </CardHeader>
+                  <CardContent className="p-3 sm:p-4 pt-0">
+                    <div className="text-xl sm:text-2xl font-bold text-amber-700 dark:text-amber-400">
+                      ₪{monthlyCashTips?.totalCashTips?.toFixed(0) || 0}
+                    </div>
+                    <p className="text-[10px] sm:text-xs text-amber-600 dark:text-amber-500">
+                      מ-{monthlyCashTips?.shiftCount || 0} משמרות
                     </p>
                   </CardContent>
                 </Card>

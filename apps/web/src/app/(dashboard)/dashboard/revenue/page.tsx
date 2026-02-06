@@ -54,6 +54,8 @@ export default function RevenuePage() {
   const [takeawayRevenue, setTakeawayRevenue] = useState<{ [shiftKey: string]: string }>({})
   const [deliveryRevenue, setDeliveryRevenue] = useState<{ [shiftKey: string]: string }>({})
   const [tips, setTips] = useState<{ [shiftKey: string]: string }>({})
+  // Track cash tips per assignment (per worker)
+  const [cashTips, setCashTips] = useState<{ [assignmentId: string]: string }>({})
   const [savingData, setSavingData] = useState<string | null>(null)
   const { toast } = useToast()
   const queryClient = useQueryClient()
@@ -104,6 +106,7 @@ export default function RevenuePage() {
       const newTakeaway: { [key: string]: string } = {}
       const newDelivery: { [key: string]: string } = {}
       const newTips: { [key: string]: string } = {}
+      const newCashTips: { [key: string]: string } = {}
       
       // Group by shift (date + type) and take first assignment's values
       const shiftMap = new Map<string, any>()
@@ -114,6 +117,9 @@ export default function RevenuePage() {
         // Combine EVENING and EVENING_CLOSE
         const shiftType = (originalType === 'EVENING_CLOSE') ? 'EVENING' : originalType
         const shiftKey = `${dateStr}_${shiftType}`
+        
+        // Store cash tips per assignment (per worker)
+        newCashTips[a.id] = (a.cashTips || 0).toString()
         
         // Only store first occurrence (all workers in shift have same values)
         if (!shiftMap.has(shiftKey)) {
@@ -130,25 +136,28 @@ export default function RevenuePage() {
       setTakeawayRevenue(newTakeaway)
       setDeliveryRevenue(newDelivery)
       setTips(newTips)
+      setCashTips(newCashTips)
     }
   }, [scheduleData])
 
   const updateShiftDataMutation = useMutation({
-    mutationFn: async ({ assignmentIds, sitting, takeaway, delivery, tips }: { 
+    mutationFn: async ({ assignmentIds, sitting, takeaway, delivery, tips, cashTipsMap }: { 
       assignmentIds: string[]; 
       sitting: number; 
       takeaway: number; 
       delivery: number;
       tips: number;
+      cashTipsMap: { [assignmentId: string]: number };
     }) => {
-      console.log('Saving revenue data:', { assignmentIds, sitting, takeaway, delivery, tips })
-      // Update all workers in the shift with the same values
+      console.log('Saving revenue data:', { assignmentIds, sitting, takeaway, delivery, tips, cashTipsMap })
+      // Update all workers in the shift - same revenue values but individual cash tips
       const results = await Promise.all(assignmentIds.map(id =>
         api.patch(`/assignments/${id}`, { 
           sittingTips: sitting,
           takeawayTips: takeaway,
           deliveryTips: delivery,
-          tipsEarned: tips 
+          tipsEarned: tips,
+          cashTips: cashTipsMap[id] || 0
         }, accessToken!)
       ))
       console.log('Save results:', results)
@@ -201,6 +210,21 @@ export default function RevenuePage() {
     const delivery = parseFloat(deliveryRevenue[shiftKey] || '0')
     const tipsValue = parseFloat(tips[shiftKey] || '0')
     
+    // Build cash tips map for all assignments
+    const cashTipsMap: { [id: string]: number } = {}
+    for (const id of assignmentIds) {
+      const cashTipValue = parseFloat(cashTips[id] || '0')
+      if (isNaN(cashTipValue) || cashTipValue < 0) {
+        toast({
+          title: 'שגיאה',
+          description: 'אנא הזן סכומי טיפים מזומן תקינים',
+          variant: 'destructive',
+        })
+        return
+      }
+      cashTipsMap[id] = cashTipValue
+    }
+    
     if (isNaN(sitting) || isNaN(takeaway) || isNaN(delivery) || isNaN(tipsValue) ||
         sitting < 0 || takeaway < 0 || delivery < 0 || tipsValue < 0) {
       toast({
@@ -218,6 +242,7 @@ export default function RevenuePage() {
       takeaway,
       delivery,
       tips: tipsValue,
+      cashTipsMap,
     })
   }
 
@@ -592,7 +617,7 @@ export default function RevenuePage() {
                                     <div className="space-y-2">
                                       <Label className="text-base font-semibold flex items-center gap-2 text-amber-600">
                                         <Coins className="h-5 w-5" />
-                                        טיפ (₪)
+                                        טיפ כרטיס (₪)
                                       </Label>
                                       <Input
                                         type="number"
@@ -605,6 +630,37 @@ export default function RevenuePage() {
                                         className="h-12 text-lg"
                                         min="0"
                                       />
+                                    </div>
+                                  </div>
+
+                                  {/* Cash Tips Per Worker */}
+                                  <div className="mt-4 pt-4 border-t">
+                                    <Label className="text-base font-semibold flex items-center gap-2 text-green-600 mb-3">
+                                      <DollarSign className="h-5 w-5" />
+                                      טיפים מזומן לכל מלצר
+                                    </Label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                      {shiftGroup.workers.map((worker: any, idx: number) => {
+                                        const assignmentId = shiftGroup.assignmentIds[idx]
+                                        return (
+                                          <div key={assignmentId} className="space-y-1.5 bg-background/50 p-3 rounded-lg">
+                                            <Label className="text-sm font-medium text-muted-foreground">
+                                              {worker.firstName} {worker.lastName}
+                                            </Label>
+                                            <Input
+                                              type="number"
+                                              placeholder="0"
+                                              value={cashTips[assignmentId] || ''}
+                                              onChange={(e) => setCashTips(prev => ({
+                                                ...prev,
+                                                [assignmentId]: e.target.value
+                                              }))}
+                                              className="h-10 text-base"
+                                              min="0"
+                                            />
+                                          </div>
+                                        )
+                                      })}
                                     </div>
                                   </div>
                                   

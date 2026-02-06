@@ -406,6 +406,27 @@ export class ReportsService {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 1);
 
+    // Get cook payroll for the month
+    const cookPayroll = await this.prisma.cookWeeklyHours.findMany({
+      where: {
+        organizationId,
+        weekStart: {
+          gte: startDate,
+          lt: endDate,
+        },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    // Get shift assignments
     const assignments = await this.prisma.shiftAssignment.findMany({
       where: {
         schedule: { organizationId },
@@ -422,6 +443,8 @@ export class ReportsService {
             firstName: true,
             lastName: true,
             hourlyWage: true,
+            baseHourlyWage: true,
+            isTipBased: true,
           },
         },
         shiftTemplate: {
@@ -429,6 +452,17 @@ export class ReportsService {
             startTime: true,
             endTime: true,
           },
+        },
+      },
+    });
+
+    // Get monthly expenses
+    const monthlyExpenses = await this.prisma.monthlyExpenses.findUnique({
+      where: {
+        organizationId_year_month: {
+          organizationId,
+          year,
+          month,
         },
       },
     });
@@ -448,22 +482,147 @@ export class ReportsService {
     };
 
     let totalHours = 0;
-    let totalCost = 0;
+    let totalEmployeeCost = 0;
+    let totalCardTips = 0;
+    let totalCashTips = 0;
     const employeeIds = new Set<string>();
 
+    // Calculate waiter costs and tips
     for (const assignment of assignments) {
       const hours = calculateHours(assignment);
       totalHours += hours;
-      totalCost += hours * assignment.user.hourlyWage;
+      
+      // Calculate cost based on whether employee is tip-based
+      let cost = 0;
+      if (assignment.user.isTipBased && assignment.user.baseHourlyWage) {
+        const cardTips = assignment.tipsEarned || 0;
+        const tipRate = hours > 0 ? cardTips / hours : 0;
+        const baseHourlyWage = assignment.user.baseHourlyWage;
+        
+        if (tipRate < baseHourlyWage) {
+          cost = (baseHourlyWage - tipRate) * hours; // Manager pays the difference
+        }
+      } else {
+        cost = hours * assignment.user.hourlyWage;
+      }
+      
+      totalEmployeeCost += cost;
+      totalCardTips += assignment.tipsEarned || 0;
+      totalCashTips += assignment.cashTips || 0;
       employeeIds.add(assignment.user.id);
     }
+
+    // Add cook payroll costs
+    const totalCookHours = cookPayroll.reduce((sum, c) => sum + c.totalHours, 0);
+    const totalCookCost = cookPayroll.reduce((sum, c) => sum + c.totalEarnings, 0);
+    
+    // Add unique cook employees to count
+    cookPayroll.forEach(c => employeeIds.add(c.user.id));
+
+    // Total employee costs
+    const totalHoursWithCooks = totalHours + totalCookHours;
+    const totalCostWithCooks = totalEmployeeCost + totalCookCost;
+
+    // Monthly expenses
+    const foodCosts = monthlyExpenses?.foodCosts || 0;
+    const extrasCosts = monthlyExpenses?.extras || 0;
+
+    // Total costs (employee + food + extras)
+    const totalCosts = totalCostWithCooks + foodCosts + extrasCosts;
+
+    // Get daily revenues for the month
+    const dailyRevenues = await this.prisma.dailyRevenue.findMany({
+      where: {
+        organizationId,
+        date: {
+          gte: startDate,
+          lt: endDate,
+        },
+      },
+    });
+
+    const totalRevenue = dailyRevenues.reduce((sum, r) => sum + r.totalRevenue, 0);
+    const profit = totalRevenue - totalCosts;
+    const profitMargin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
 
     return {
       year,
       month,
-      totalHours,
-      totalCost,
-      employeeCount: employeeIds.size,
+      summary: {
+        totalHours: totalHoursWithCooks,
+        employeeCost: totalCostWithCooks,
+        foodCosts,
+        extrasCosts,
+        totalCosts,
+        totalRevenue,
+        profit,
+        profitMargin,
+        cardTips: totalCardTips,
+        cashTips: totalCashTips,
+        totalTips: totalCardTips + totalCashTips,
+        employeeCount: employeeIds.size,
+        shiftCount: assignments.length,
+        waiterHours: totalHours,
+        waiterCost: totalEmployeeCost,
+        cookHours: totalCookHours,
+        cookCost: totalCookCost,
+      },
+      expenses: {
+        foodCosts,
+        extrasCosts,
+        notes: monthlyExpenses?.notes,
+      },
+    };
+  }
+
+  /**
+   * Get employee monthly cash tips
+   */
+  async getEmployeeMonthlyCashTips(
+    userId: string,
+    organizationId: string,
+    year: number,
+    month: number,
+  ) {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 1);
+
+    // Verify user belongs to organization
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, organizationId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const assignments = await this.prisma.shiftAssignment.findMany({
+      where: {
+        userId,
+        schedule: { organizationId },
+        shiftDate: {
+          gte: startDate,
+          lt: endDate,
+        },
+        status: { not: 'CANCELLED' },
+      },
+      select: {
+        cashTips: true,
+        tipsEarned: true,
+        shiftDate: true,
+      },
+    });
+
+    const totalCashTips = assignments.reduce((sum, a) => sum + (a.cashTips || 0), 0);
+    const totalCardTips = assignments.reduce((sum, a) => sum + (a.tipsEarned || 0), 0);
+
+    return {
+      userId,
+      year,
+      month,
+      totalCashTips,
+      totalCardTips,
+      totalTips: totalCashTips + totalCardTips,
       shiftCount: assignments.length,
     };
   }
