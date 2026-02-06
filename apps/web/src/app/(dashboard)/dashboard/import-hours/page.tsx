@@ -390,19 +390,13 @@ export default function ImportHoursPage() {
               <StaggerItem>
                 <Card>
                   <CardContent className="p-3 sm:p-4 text-center">
-                    <FileSpreadsheet className="h-5 w-5 mx-auto text-orange-500 mb-1" />
-                    <p className="text-2xl font-bold">{preview.summary.totalShifts}</p>
-                    <p className="text-xs text-muted-foreground">משמרות</p>
+                    <UserPlus className="h-5 w-5 mx-auto text-blue-500 mb-1" />
+                    <p className="text-2xl font-bold">{unmappedCount}</p>
+                    <p className="text-xs text-muted-foreground">חדשים</p>
                   </CardContent>
                 </Card>
               </StaggerItem>
             </StaggerContainer>
-
-            {/* File info */}
-            <div className="flex items-center gap-2 text-sm text-muted-foreground px-1">
-              <FileSpreadsheet className="h-4 w-4" />
-              <span>{preview.fileName}</span>
-            </div>
 
             {/* Legend */}
             <Card className="bg-muted/40 border-dashed">
