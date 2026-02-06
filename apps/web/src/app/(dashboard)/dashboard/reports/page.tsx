@@ -7,7 +7,7 @@ import { he } from 'date-fns/locale'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
 import { getWeekStartDate } from '@/lib/utils'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -480,7 +480,6 @@ export default function ReportsPage() {
                 </CardContent>
               </Card>
             )}
-          </StaggerContainer>
 
             {/* Week vs Week Comparison */}
             {prevWeekReport && (

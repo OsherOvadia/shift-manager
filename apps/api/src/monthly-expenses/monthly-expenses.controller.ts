@@ -26,7 +26,7 @@ export class MonthlyExpensesController {
   @Roles('ADMIN', 'MANAGER')
   async createOrUpdate(
     @Body() createDto: CreateMonthlyExpensesDto,
-    @Request() req,
+    @Request() req: any,
   ) {
     return this.service.createOrUpdate(createDto, req.user.organizationId);
   }
@@ -36,14 +36,14 @@ export class MonthlyExpensesController {
   async update(
     @Param('id') id: string,
     @Body() updateDto: UpdateMonthlyExpensesDto,
-    @Request() req,
+    @Request() req: any,
   ) {
     return this.service.update(id, updateDto, req.user.organizationId);
   }
 
   @Get()
   @Roles('ADMIN', 'MANAGER')
-  async findOne(@Query('year') year: string, @Query('month') month: string, @Request() req) {
+  async findOne(@Query('year') year: string, @Query('month') month: string, @Request() req: any) {
     return this.service.findOne(
       parseInt(year),
       parseInt(month),
@@ -58,7 +58,7 @@ export class MonthlyExpensesController {
     @Query('startMonth') startMonth: string,
     @Query('endYear') endYear: string,
     @Query('endMonth') endMonth: string,
-    @Request() req,
+    @Request() req: any,
   ) {
     return this.service.findByYearRange(
       parseInt(startYear),
@@ -71,7 +71,7 @@ export class MonthlyExpensesController {
 
   @Delete(':id')
   @Roles('ADMIN', 'MANAGER')
-  async remove(@Param('id') id: string, @Request() req) {
+  async remove(@Param('id') id: string, @Request() req: any) {
     return this.service.remove(id, req.user.organizationId);
   }
 }
