@@ -310,4 +310,6 @@ export function Confetti({ trigger }: { trigger: boolean }) {
   )
 }
 
-export { AnimatePresence, motion }
+// Re-export framer-motion
+export { motion } from 'framer-motion'
+export { AnimatePresence } from 'framer-motion'
