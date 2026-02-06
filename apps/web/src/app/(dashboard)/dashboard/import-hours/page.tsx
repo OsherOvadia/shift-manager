@@ -29,6 +29,8 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronUp,
+  UserPlus,
+  UserCheck,
 } from 'lucide-react'
 
 interface WorkerMatch {
@@ -130,12 +132,18 @@ export default function ImportHoursPage() {
         accessToken!,
       )
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       setApplyResult(data)
       setStep('success')
       queryClient.invalidateQueries({ queryKey: ['assignments'] })
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      const created = data.summary?.created || 0
       toast({
-        title: 'השעות עודכנו בהצלחה',
+        title: 'העדכון הושלם בהצלחה',
+        description: created > 0
+          ? `${created} עובדים חדשים נוצרו - נשלחה התראה להשלמת הפרטים`
+          : undefined,
       })
     },
     onError: (error: any) => {
@@ -221,8 +229,9 @@ export default function ImportHoursPage() {
     setApplyResult(null)
   }
 
-  const mappedCount = Object.keys(workerMapping).length
+  const mappedCount = Object.keys(workerMapping).filter(k => workerMapping[k]).length
   const totalWorkers = preview?.summary.totalWorkers || 0
+  const unmappedCount = totalWorkers - mappedCount
 
   return (
     <PageTransition>
@@ -395,23 +404,47 @@ export default function ImportHoursPage() {
               <span>{preview.fileName}</span>
             </div>
 
+            {/* Legend */}
+            <Card className="bg-muted/40 border-dashed">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <span><strong>זוהה</strong> - עובד קיים במערכת</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <UserPlus className="h-4 w-4 text-blue-500" />
+                    <span><strong>חדש</strong> - ייוצר פרופיל חדש אוטומטית</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  עובדים שלא זוהו יקבלו פרופיל חדש במערכת. תקבל התראה להשלמת הפרטים שלהם (תפקיד, שכר, אימייל).
+                </p>
+              </CardContent>
+            </Card>
+
             {/* Workers list */}
             <div className="space-y-3">
-              <h2 className="font-semibold text-base">עובדים שנמצאו בקובץ</h2>
+              <h2 className="font-semibold text-base">עובדים שנמצאו בקובץ ({preview.summary.totalWorkers})</h2>
 
               {preview.workers.map((worker, idx) => {
                 const isExpanded = expandedWorkers.has(worker.name)
                 const currentMapping = workerMapping[worker.name]
-                const statusIcon = currentMapping ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-                ) : worker.matchStatus === 'partial' ? (
-                  <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                const isMatched = !!currentMapping
+                const statusIcon = isMatched ? (
+                  <div className="flex flex-col items-center gap-0.5">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+                    <span className="text-[10px] text-green-600 font-medium">זוהה</span>
+                  </div>
                 ) : (
-                  <XCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
+                  <div className="flex flex-col items-center gap-0.5">
+                    <UserPlus className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                    <span className="text-[10px] text-blue-600 font-medium">חדש</span>
+                  </div>
                 )
 
                 return (
-                  <Card key={worker.name + idx} className="overflow-hidden">
+                  <Card key={worker.name + idx} className={`overflow-hidden ${!isMatched ? 'border-blue-200 dark:border-blue-500/30 bg-blue-50/30 dark:bg-blue-500/5' : ''}`}>
                     <div
                       className="p-3 sm:p-4 cursor-pointer hover:bg-muted/50 active:bg-muted transition-colors"
                       onClick={() => toggleWorkerExpand(worker.name)}
@@ -421,9 +454,16 @@ export default function ImportHoursPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-base">{worker.name}</span>
-                            {currentMapping && (
-                              <Badge variant="secondary" className="text-xs">
+                            {isMatched && (
+                              <Badge variant="secondary" className="text-xs gap-1">
+                                <UserCheck className="h-3 w-3" />
                                 {worker.matchedUserName || employees.find(e => e.id === currentMapping)?.name}
+                              </Badge>
+                            )}
+                            {!isMatched && (
+                              <Badge variant="outline" className="text-xs text-blue-600 border-blue-300 gap-1">
+                                <UserPlus className="h-3 w-3" />
+                                ייוצר פרופיל חדש
                               </Badge>
                             )}
                           </div>
@@ -526,22 +566,42 @@ export default function ImportHoursPage() {
               })}
             </div>
 
+            {/* Info about what will happen */}
+            {unmappedCount > 0 && (
+              <Card className="border-blue-200 dark:border-blue-500/30 bg-blue-50/50 dark:bg-blue-500/5">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-start gap-2">
+                    <UserPlus className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium text-blue-700 dark:text-blue-400">
+                        {unmappedCount} עובדים חדשים ייוצרו אוטומטית
+                      </p>
+                      <p className="text-blue-600/70 dark:text-blue-400/70 mt-0.5">
+                        תקבל התראה להשלמת הפרטים שלהם: תפקיד (מלצר/שוטף/טבח), שכר, אימייל ועוד.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Action buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2 pb-4">
               <Button
                 className="h-12 sm:h-11 text-base sm:text-sm flex-1 gap-2"
                 onClick={() => applyMutation.mutate()}
-                disabled={applyMutation.isPending || mappedCount === 0}
+                disabled={applyMutation.isPending}
               >
                 {applyMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    מעדכן...
+                    מעבד...
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="h-4 w-4" />
-                    אשר ועדכן ({mappedCount}/{totalWorkers} עובדים)
+                    אשר ועדכן {totalWorkers} עובדים
+                    {unmappedCount > 0 && ` (${unmappedCount} חדשים)`}
                   </>
                 )}
               </Button>
@@ -566,11 +626,50 @@ export default function ImportHoursPage() {
                 <SuccessCheck className="h-16 w-16 text-green-500 mx-auto mb-4" />
                 <h2 className="text-xl font-bold mb-2">העדכון הושלם בהצלחה!</h2>
                 {applyResult && (
-                  <div className="space-y-1 text-muted-foreground">
-                    <p>עודכנו {applyResult.summary?.updated || 0} עובדים</p>
+                  <div className="space-y-2 text-muted-foreground">
+                    {(applyResult.summary?.updated || 0) > 0 && (
+                      <div className="flex items-center justify-center gap-2">
+                        <UserCheck className="h-4 w-4 text-green-500" />
+                        <span>עודכנו {applyResult.summary.updated} עובדים קיימים</span>
+                      </div>
+                    )}
+                    {(applyResult.summary?.created || 0) > 0 && (
+                      <div className="flex items-center justify-center gap-2">
+                        <UserPlus className="h-4 w-4 text-blue-500" />
+                        <span>נוצרו {applyResult.summary.created} עובדים חדשים</span>
+                      </div>
+                    )}
                     <p>סה&quot;כ {applyResult.summary?.totalHours?.toFixed(1) || 0} שעות</p>
                   </div>
                 )}
+
+                {/* New workers notification */}
+                {applyResult?.newlyCreated?.length > 0 && (
+                  <Card className="mt-4 border-blue-200 dark:border-blue-500/30 bg-blue-50/50 dark:bg-blue-500/5 text-right">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                        <div className="text-sm">
+                          <p className="font-medium text-blue-700 dark:text-blue-400 mb-2">
+                            נשלחה התראה להשלמת פרטי העובדים החדשים:
+                          </p>
+                          <ul className="space-y-1">
+                            {applyResult.newlyCreated.map((w: any) => (
+                              <li key={w.id} className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                                {w.name}
+                              </li>
+                            ))}
+                          </ul>
+                          <p className="text-blue-600/70 dark:text-blue-400/70 mt-2">
+                            עבור לעמוד &quot;עובדים&quot; כדי להשלים את הפרטים: תפקיד, שכר, אימייל.
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <Button
                   className="mt-6 h-12 gap-2"
                   onClick={resetImport}

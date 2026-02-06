@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as XLSX from 'xlsx';
+import * as bcrypt from 'bcrypt';
 
 interface ParsedShift {
   day: string;           // Hebrew day letter (א, ב, ג, etc.)
@@ -103,6 +104,7 @@ export class HoursImportService {
 
   /**
    * Apply the import - update worker hours in the database
+   * For unmatched workers: auto-create user profiles and notify managers
    */
   async applyImport(
     sessionId: string,
@@ -121,24 +123,43 @@ export class HoursImportService {
       workerMapping,
     );
 
-    const results: { name: string; userId: string; totalHours: number; status: string }[] = [];
+    const results: { name: string; userId: string; totalHours: number; status: string; isNew: boolean }[] = [];
+    const newlyCreatedUsers: { id: string; name: string }[] = [];
 
     for (const worker of matchedWorkers) {
-      if (!worker.matchedUserId) continue;
+      if (worker.matchedUserId) {
+        // Existing matched worker
+        const user = await this.prisma.user.findFirst({
+          where: { id: worker.matchedUserId, organizationId },
+        });
 
-      // Get the user to check hourly wage
-      const user = await this.prisma.user.findFirst({
-        where: { id: worker.matchedUserId, organizationId },
-      });
+        if (!user) continue;
 
-      if (!user) continue;
+        results.push({
+          name: worker.name,
+          userId: worker.matchedUserId,
+          totalHours: worker.totalHours,
+          status: 'updated',
+          isNew: false,
+        });
+      } else {
+        // Unmatched worker - auto-create a new user profile
+        const newUser = await this.createWorkerProfile(worker.name, organizationId);
+        newlyCreatedUsers.push({ id: newUser.id, name: worker.name });
 
-      results.push({
-        name: worker.name,
-        userId: worker.matchedUserId,
-        totalHours: worker.totalHours,
-        status: 'updated',
-      });
+        results.push({
+          name: worker.name,
+          userId: newUser.id,
+          totalHours: worker.totalHours,
+          status: 'created',
+          isNew: true,
+        });
+      }
+    }
+
+    // Send notifications to managers/admins about newly created users
+    if (newlyCreatedUsers.length > 0) {
+      await this.notifyManagersAboutNewWorkers(organizationId, newlyCreatedUsers);
     }
 
     // Clean up session
@@ -147,11 +168,86 @@ export class HoursImportService {
     return {
       success: true,
       results,
+      newlyCreated: newlyCreatedUsers,
       summary: {
-        updated: results.length,
+        updated: results.filter(r => !r.isNew).length,
+        created: newlyCreatedUsers.length,
         totalHours: results.reduce((sum, r) => sum + r.totalHours, 0),
       },
     };
+  }
+
+  /**
+   * Create a new worker profile from an Excel name
+   * Creates with minimal info - manager needs to complete the profile
+   */
+  private async createWorkerProfile(name: string, organizationId: string) {
+    // Split name into first/last - for single names, use it as firstName
+    const nameParts = name.trim().split(/\s+/);
+    const firstName = nameParts[0] || name;
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '-';
+
+    // Generate a placeholder email and password
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 6);
+    const placeholderEmail = `worker_${timestamp}_${randomSuffix}@placeholder.local`;
+    const tempPassword = `Temp${timestamp}!`;
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: placeholderEmail,
+        passwordHash,
+        firstName,
+        lastName,
+        role: 'EMPLOYEE' as any,
+        employmentType: 'FULL_TIME' as any,
+        organizationId,
+        isApproved: true,
+        isActive: true,
+        hourlyWage: 0,
+      },
+    });
+
+    return user;
+  }
+
+  /**
+   * Notify all managers and admins about newly created worker profiles
+   * that need their details filled in (job type, salary, email, etc.)
+   */
+  private async notifyManagersAboutNewWorkers(
+    organizationId: string,
+    newWorkers: { id: string; name: string }[],
+  ) {
+    // Find all managers and admins in the organization
+    const managers = await this.prisma.user.findMany({
+      where: {
+        organizationId,
+        isActive: true,
+        isApproved: true,
+        role: { in: ['ADMIN', 'MANAGER'] as any },
+      },
+      select: { id: true },
+    });
+
+    const workerNames = newWorkers.map(w => w.name).join(', ');
+    const title = `👤 עובדים חדשים נוצרו מקובץ שעות`;
+    const message = newWorkers.length === 1
+      ? `העובד/ת "${newWorkers[0].name}" נוצר/ה אוטומטית מהעלאת קובץ שעות. נא להשלים את הפרטים: תפקיד, שכר, אימייל ועוד.`
+      : `${newWorkers.length} עובדים חדשים נוצרו אוטומטית מהעלאת קובץ שעות: ${workerNames}. נא להשלים את הפרטים שלהם: תפקיד, שכר, אימייל ועוד.`;
+
+    // Create notification for each manager/admin
+    for (const manager of managers) {
+      await this.prisma.notification.create({
+        data: {
+          userId: manager.id,
+          title,
+          message,
+          type: 'SHIFT_CHANGED' as any, // Using existing type - closest match
+        },
+      });
+    }
   }
 
   /**
