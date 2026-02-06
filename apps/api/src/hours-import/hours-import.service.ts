@@ -12,6 +12,7 @@ interface ParsedShift {
 
 interface ParsedWorker {
   name: string;           // Worker name from Excel
+  category: string;       // Department from Excel (מחלקה) - e.g. "מלצר", "טבח", "אחמשית"
   shifts: ParsedShift[];
   totalHours: number;
   hours100: number;
@@ -41,7 +42,7 @@ export interface ImportPreview {
 }
 
 // In-memory store for import sessions (simple approach, no Redis needed)
-const importSessions = new Map<string, { preview: ImportPreview; parsedData: ParsedWorker[]; timestamp: number }>();
+const importSessions = new Map<string, { preview: ImportPreview; parsedData: ParsedWorker[]; timestamp: number; weekStartDate?: string }>();
 
 // Clean up old sessions (older than 30 minutes)
 function cleanOldSessions() {
@@ -52,6 +53,29 @@ function cleanOldSessions() {
     }
   }
 }
+
+// Hebrew day letter to day-of-week offset (Sunday-based, 0=Sunday)
+const HEBREW_DAY_MAP: { [key: string]: number } = {
+  'א': 0, // Sunday
+  'ב': 1, // Monday
+  'ג': 2, // Tuesday
+  'ד': 3, // Wednesday
+  'ה': 4, // Thursday
+  'ו': 5, // Friday
+  'ש': 6, // Saturday
+};
+
+// Known department values mapped to job category names
+const DEPARTMENT_TO_CATEGORY: { [key: string]: { category: string; isTipBased: boolean } } = {
+  'מלצר': { category: 'waiter', isTipBased: true },
+  'מלצרית': { category: 'waiter', isTipBased: true },
+  'אחמשית': { category: 'waiter', isTipBased: true },
+  'אח"מ': { category: 'waiter', isTipBased: true },
+  'טבח': { category: 'cook', isTipBased: false },
+  'טבחית': { category: 'cook', isTipBased: false },
+  'שוטף': { category: 'dishwasher', isTipBased: false },
+  'שוטף כלים': { category: 'dishwasher', isTipBased: false },
+};
 
 @Injectable()
 export class HoursImportService {
@@ -65,6 +89,7 @@ export class HoursImportService {
     fileName: string,
     organizationId: string,
     workerOverrides?: { [excelName: string]: string },
+    weekStartDate?: string,
   ): Promise<ImportPreview> {
     cleanOldSessions();
 
@@ -97,6 +122,7 @@ export class HoursImportService {
       preview,
       parsedData: parsedWorkers,
       timestamp: Date.now(),
+      weekStartDate,
     });
 
     return preview;
@@ -105,16 +131,22 @@ export class HoursImportService {
   /**
    * Apply the import - update worker hours in the database
    * For unmatched workers: auto-create user profiles and notify managers
+   * Creates actual ShiftAssignment records so data flows into financial reports
    */
   async applyImport(
     sessionId: string,
     organizationId: string,
     workerMapping: { [excelName: string]: string },
+    weekStartDate?: string,
+    adminUserId?: string,
   ) {
     const session = importSessions.get(sessionId);
     if (!session) {
       throw new BadRequestException('Import session expired or not found. Please upload the file again.');
     }
+
+    // Use weekStartDate from apply call or fall back to session
+    const effectiveWeekStart = weekStartDate || session.weekStartDate;
 
     // Re-match with the user-supplied mapping
     const matchedWorkers = await this.matchWorkers(
@@ -123,8 +155,22 @@ export class HoursImportService {
       workerMapping,
     );
 
+    // Fetch default hourly wage from settings
+    const settings = await this.prisma.businessSettings.findUnique({
+      where: { organizationId },
+    });
+    const defaultWage = (settings as any)?.defaultHourlyWage ?? 30;
+
+    // Fetch job categories for auto-assignment
+    const jobCategories = await this.prisma.jobCategory.findMany({
+      where: { organizationId, isActive: true },
+    });
+
     const results: { name: string; userId: string; totalHours: number; status: string; isNew: boolean }[] = [];
     const newlyCreatedUsers: { id: string; name: string }[] = [];
+
+    // Track names we've created in this batch for duplicate numbering
+    const createdNames = new Map<string, number>(); // baseName -> count
 
     for (const worker of matchedWorkers) {
       if (worker.matchedUserId) {
@@ -144,8 +190,18 @@ export class HoursImportService {
         });
       } else {
         // Unmatched worker - auto-create a new user profile
-        const newUser = await this.createWorkerProfile(worker.name, organizationId);
+        const newUser = await this.createWorkerProfile(
+          worker.name,
+          organizationId,
+          defaultWage,
+          worker.category,
+          jobCategories,
+          createdNames,
+        );
         newlyCreatedUsers.push({ id: newUser.id, name: worker.name });
+
+        // Set the matched user ID so we can create assignments
+        worker.matchedUserId = newUser.id;
 
         results.push({
           name: worker.name,
@@ -155,6 +211,17 @@ export class HoursImportService {
           isNew: true,
         });
       }
+    }
+
+    // Create actual shift assignments if we have a week start date
+    let assignmentsCreated = 0;
+    if (effectiveWeekStart) {
+      assignmentsCreated = await this.createShiftAssignments(
+        matchedWorkers,
+        organizationId,
+        effectiveWeekStart,
+        adminUserId,
+      );
     }
 
     // Send notifications to managers/admins about newly created users
@@ -173,19 +240,47 @@ export class HoursImportService {
         updated: results.filter(r => !r.isNew).length,
         created: newlyCreatedUsers.length,
         totalHours: results.reduce((sum, r) => sum + r.totalHours, 0),
+        assignmentsCreated,
       },
     };
   }
 
   /**
    * Create a new worker profile from an Excel name
-   * Creates with minimal info - manager needs to complete the profile
+   * Handles duplicate names with numbering, auto-assigns job category
    */
-  private async createWorkerProfile(name: string, organizationId: string) {
-    // Split name into first/last - for single names, use it as firstName
+  private async createWorkerProfile(
+    name: string,
+    organizationId: string,
+    defaultWage: number,
+    category: string,
+    jobCategories: any[],
+    createdNames: Map<string, number>,
+  ) {
+    // Split name into first/last - for single names, use it as firstName with empty lastName
     const nameParts = name.trim().split(/\s+/);
-    const firstName = nameParts[0] || name;
-    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '-';
+    let firstName = nameParts[0] || name;
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
+    // Handle duplicate first names: check DB + current batch
+    const existingWithSameName = await this.prisma.user.findMany({
+      where: {
+        organizationId,
+        firstName: firstName,
+      },
+      select: { id: true, firstName: true },
+    });
+
+    const batchCount = createdNames.get(firstName) || 0;
+    const totalExisting = existingWithSameName.length + batchCount;
+
+    if (totalExisting > 0) {
+      // Append number suffix: "יובל 2", "יובל 3", etc.
+      firstName = `${firstName} ${totalExisting + 1}`;
+    }
+
+    // Track this name in the current batch
+    createdNames.set(nameParts[0] || name, batchCount + 1);
 
     // Generate a placeholder email and password
     const timestamp = Date.now();
@@ -194,22 +289,214 @@ export class HoursImportService {
     const tempPassword = `Temp${timestamp}!`;
     const passwordHash = await bcrypt.hash(tempPassword, 10);
 
+    // Auto-assign job category based on department from Excel
+    let jobCategoryId: string | null = null;
+    let isTipBased = false;
+    const categoryLower = (category || '').trim();
+
+    if (categoryLower) {
+      const mapping = DEPARTMENT_TO_CATEGORY[categoryLower];
+      if (mapping) {
+        // Find matching job category in the org
+        const matchedCategory = jobCategories.find(
+          jc => jc.name === mapping.category || jc.nameHe === categoryLower
+        );
+        if (matchedCategory) {
+          jobCategoryId = matchedCategory.id;
+        }
+        isTipBased = mapping.isTipBased;
+      } else {
+        // Try to match by nameHe directly
+        const matchedCategory = jobCategories.find(
+          jc => jc.nameHe === categoryLower
+        );
+        if (matchedCategory) {
+          jobCategoryId = matchedCategory.id;
+        }
+      }
+    }
+
+    const userData: any = {
+      email: placeholderEmail,
+      passwordHash,
+      firstName,
+      lastName,
+      role: 'EMPLOYEE' as any,
+      employmentType: 'FULL_TIME' as any,
+      organizationId,
+      isApproved: true,
+      isActive: true,
+      hourlyWage: defaultWage,
+      isTipBased,
+    };
+
+    if (jobCategoryId) {
+      userData.jobCategoryId = jobCategoryId;
+    }
+
     const user = await this.prisma.user.create({
-      data: {
-        email: placeholderEmail,
-        passwordHash,
-        firstName,
-        lastName,
-        role: 'EMPLOYEE' as any,
-        employmentType: 'FULL_TIME' as any,
-        organizationId,
-        isApproved: true,
-        isActive: true,
-        hourlyWage: 0,
-      },
+      data: userData,
     });
 
     return user;
+  }
+
+  /**
+   * Create actual ShiftAssignment records from imported Excel data.
+   * This makes the data appear in financial reports and the schedule board.
+   */
+  private async createShiftAssignments(
+    workers: MatchedWorker[],
+    organizationId: string,
+    weekStartDateStr: string,
+    adminUserId?: string,
+  ): Promise<number> {
+    const weekStartDate = new Date(weekStartDateStr);
+    if (isNaN(weekStartDate.getTime())) {
+      return 0;
+    }
+
+    // Normalize to midnight UTC
+    weekStartDate.setUTCHours(0, 0, 0, 0);
+
+    // Find or create a WeeklySchedule for this week
+    let schedule = await this.prisma.weeklySchedule.findUnique({
+      where: {
+        organizationId_weekStartDate: {
+          organizationId,
+          weekStartDate,
+        },
+      },
+    });
+
+    if (!schedule) {
+      // Need a createdById - use the admin user or first admin in org
+      let creatorId = adminUserId;
+      if (!creatorId) {
+        const admin = await this.prisma.user.findFirst({
+          where: { organizationId, role: { in: ['ADMIN', 'MANAGER'] as any } },
+          select: { id: true },
+        });
+        creatorId = admin?.id;
+      }
+      if (!creatorId) return 0;
+
+      schedule = await this.prisma.weeklySchedule.create({
+        data: {
+          organizationId,
+          weekStartDate,
+          status: 'PUBLISHED' as any,
+          createdById: creatorId,
+          publishedAt: new Date(),
+        },
+      });
+    }
+
+    // Get shift templates for time matching
+    const templates = await this.prisma.shiftTemplate.findMany({
+      where: { organizationId, isActive: true },
+      orderBy: { startTime: 'asc' },
+    });
+
+    if (templates.length === 0) return 0;
+
+    let assignmentsCreated = 0;
+
+    for (const worker of workers) {
+      if (!worker.matchedUserId) continue;
+
+      for (const shift of worker.shifts) {
+        const dayOffset = HEBREW_DAY_MAP[shift.day];
+        if (dayOffset === undefined) continue;
+
+        // Calculate the actual date for this shift
+        const shiftDate = new Date(weekStartDate);
+        shiftDate.setUTCDate(shiftDate.getUTCDate() + dayOffset);
+
+        // Match to a shift template based on start time
+        const template = this.findBestTemplate(templates, shift.startTime);
+        if (!template) continue;
+
+        try {
+          // Upsert - create or update the assignment
+          await this.prisma.shiftAssignment.upsert({
+            where: {
+              scheduleId_userId_shiftDate_shiftTemplateId: {
+                scheduleId: schedule.id,
+                userId: worker.matchedUserId,
+                shiftDate,
+                shiftTemplateId: template.id,
+              },
+            },
+            update: {
+              actualStartTime: shift.startTime,
+              actualEndTime: shift.endTime,
+              actualHours: shift.totalHours,
+              status: 'CONFIRMED' as any,
+            },
+            create: {
+              scheduleId: schedule.id,
+              userId: worker.matchedUserId,
+              shiftTemplateId: template.id,
+              shiftDate,
+              actualStartTime: shift.startTime,
+              actualEndTime: shift.endTime,
+              actualHours: shift.totalHours,
+              status: 'CONFIRMED' as any,
+            },
+          });
+          assignmentsCreated++;
+        } catch (err) {
+          // Log but don't fail the entire import for one assignment
+          console.error(`Failed to create assignment for ${worker.name} on day ${shift.day}:`, err);
+        }
+      }
+    }
+
+    return assignmentsCreated;
+  }
+
+  /**
+   * Find the best matching shift template based on start time.
+   * If start time is before 15:00, use MORNING template; otherwise EVENING.
+   * If no match by time, use first available template.
+   */
+  private findBestTemplate(templates: any[], startTime: string | null): any {
+    if (!startTime) {
+      // No time info - return first template
+      return templates[0] || null;
+    }
+
+    const [hours] = startTime.split(':').map(Number);
+
+    // Determine shift type based on start hour
+    if (hours < 15) {
+      // Morning shift
+      const morning = templates.find(t => t.shiftType === 'MORNING');
+      if (morning) return morning;
+    } else {
+      // Evening shift
+      const evening = templates.find(t => t.shiftType === 'EVENING' || t.shiftType === 'EVENING_CLOSE');
+      if (evening) return evening;
+    }
+
+    // Fallback: match closest start time
+    let bestTemplate = templates[0];
+    let bestDiff = Infinity;
+
+    for (const t of templates) {
+      const [tHours, tMinutes] = t.startTime.split(':').map(Number);
+      const tMins = tHours * 60 + (tMinutes || 0);
+      const [sHours, sMinutes] = startTime.split(':').map(Number);
+      const sMins = sHours * 60 + (sMinutes || 0);
+      const diff = Math.abs(tMins - sMins);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        bestTemplate = t;
+      }
+    }
+
+    return bestTemplate;
   }
 
   /**
@@ -269,7 +556,7 @@ export class HoursImportService {
 
     return users.map(u => ({
       id: u.id,
-      name: `${u.firstName} ${u.lastName}`,
+      name: `${u.firstName} ${u.lastName}`.trim(),
       firstName: u.firstName,
       lastName: u.lastName,
       category: u.jobCategory?.nameHe || u.jobCategory?.name || '',
@@ -300,6 +587,7 @@ export class HoursImportService {
   private parseSheetData(data: any[][]): ParsedWorker[] {
     const workers: ParsedWorker[] = [];
     let currentWorkerName: string | null = null;
+    let currentWorkerCategory: string = '';
     let currentShifts: ParsedShift[] = [];
     let totalHours = 0;
     let hours100 = 0;
@@ -307,11 +595,8 @@ export class HoursImportService {
     let hours150 = 0;
     let workDays = 0;
 
-    // Find worker sections by scanning for patterns
-    // The Excel format has:
-    // - Header row with: "עובד" column (worker name), day columns, times, hours
-    // - Data rows with shifts
-    // - Summary rows with totals
+    // Known department/category keywords
+    const knownDepartments = new Set(Object.keys(DEPARTMENT_TO_CATEGORY));
 
     for (let rowIdx = 0; rowIdx < data.length; rowIdx++) {
       const row = data[rowIdx];
@@ -330,6 +615,7 @@ export class HoursImportService {
         if (currentWorkerName) {
           workers.push({
             name: currentWorkerName,
+            category: currentWorkerCategory,
             shifts: currentShifts,
             totalHours,
             hours100,
@@ -361,6 +647,7 @@ export class HoursImportService {
         }
 
         currentWorkerName = name || null;
+        currentWorkerCategory = '';
         currentShifts = [];
         totalHours = 0;
         hours100 = 0;
@@ -371,28 +658,34 @@ export class HoursImportService {
       }
 
       // Check for worker data rows - they have a name, day letter, and hours
-      // Pattern: [worker_name_column] [day_letter] [name] [... hours data]
-      // Based on the Excel: columns contain עובד, שם, יום, הפסקה, שבת, 150%, 125%, 100%, סה"כ, יציאה, כניסה, תאריך
+      const hebrewDays = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
+
       if (currentWorkerName === null) {
         // Try to find worker name from data rows directly
         // The Excel shows rows like: "אחמשית | יובל | א | 0 | 0 | 5.36 | 0 | 5:22 | 0:22 | 19:00 | ###"
-        // Worker name appears in "שם" column and category in "עובד" column
+        // Worker name appears in "שם" column and category in "עובד" column (מחלקה)
 
         // Look for rows that have time patterns (HH:MM) which indicate shift data
         const hasTimePattern = rowStr.some(cell => /^\d{1,2}:\d{2}$/.test(cell));
         if (!hasTimePattern) continue;
 
         // This is likely a data row without a prior worker header
-        // Try to extract name from the row
-        const hebrewDays = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
+        // Extract name, day, and category from the row
         let nameFound = '';
         let dayFound = '';
+        let categoryFound = '';
 
         for (const cell of rowStr) {
           if (hebrewDays.includes(cell) && !dayFound) {
             dayFound = cell;
-          } else if (cell.length > 1 && /^[\u0590-\u05FF]+$/.test(cell) && !nameFound) {
-            nameFound = cell;
+          } else if (cell.length > 1 && /^[\u0590-\u05FF\s]+$/.test(cell)) {
+            // Multi-character Hebrew word - could be name or department
+            const trimmed = cell.trim();
+            if (knownDepartments.has(trimmed)) {
+              categoryFound = trimmed;
+            } else if (!nameFound && trimmed.length > 1) {
+              nameFound = trimmed;
+            }
           }
         }
 
@@ -402,6 +695,7 @@ export class HoursImportService {
           if (!existingWorker) {
             existingWorker = {
               name: nameFound,
+              category: categoryFound,
               shifts: [],
               totalHours: 0,
               hours100: 0,
@@ -410,6 +704,8 @@ export class HoursImportService {
               workDays: 0,
             };
             workers.push(existingWorker);
+          } else if (categoryFound && !existingWorker.category) {
+            existingWorker.category = categoryFound;
           }
 
           // Extract shift data from this row
@@ -480,13 +776,23 @@ export class HoursImportService {
         continue;
       }
 
-      // Regular data row - extract shift data
-      const hebrewDays = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
+      // Regular data row - extract shift data and possibly category
       let dayFound = '';
       for (const cell of rowStr) {
         if (hebrewDays.includes(cell)) {
           dayFound = cell;
           break;
+        }
+      }
+
+      // Try to extract category from the row (first known department keyword)
+      if (!currentWorkerCategory) {
+        for (const cell of rowStr) {
+          const trimmed = cell.trim();
+          if (knownDepartments.has(trimmed)) {
+            currentWorkerCategory = trimmed;
+            break;
+          }
         }
       }
 
@@ -508,6 +814,7 @@ export class HoursImportService {
 
       workers.push({
         name: currentWorkerName,
+        category: currentWorkerCategory,
         shifts: currentShifts,
         totalHours,
         hours100,
@@ -615,7 +922,7 @@ export class HoursImportService {
           return {
             ...worker,
             matchedUserId: user.id,
-            matchedUserName: `${user.firstName} ${user.lastName}`,
+            matchedUserName: `${user.firstName} ${user.lastName}`.trim(),
             matchStatus: 'matched' as const,
             matchCandidates: [],
           };
@@ -630,7 +937,7 @@ export class HoursImportService {
         return {
           ...worker,
           matchedUserId: exactFirstMatch.id,
-          matchedUserName: `${exactFirstMatch.firstName} ${exactFirstMatch.lastName}`,
+          matchedUserName: `${exactFirstMatch.firstName} ${exactFirstMatch.lastName}`.trim(),
           matchStatus: 'matched' as const,
           matchCandidates: [],
         };
@@ -645,7 +952,7 @@ export class HoursImportService {
         return {
           ...worker,
           matchedUserId: fullNameMatch.id,
-          matchedUserName: `${fullNameMatch.firstName} ${fullNameMatch.lastName}`,
+          matchedUserName: `${fullNameMatch.firstName} ${fullNameMatch.lastName}`.trim(),
           matchStatus: 'matched' as const,
           matchCandidates: [],
         };
@@ -659,7 +966,7 @@ export class HoursImportService {
         return {
           ...worker,
           matchedUserId: lastNameMatch.id,
-          matchedUserName: `${lastNameMatch.firstName} ${lastNameMatch.lastName}`,
+          matchedUserName: `${lastNameMatch.firstName} ${lastNameMatch.lastName}`.trim(),
           matchStatus: 'matched' as const,
           matchCandidates: [],
         };
@@ -669,7 +976,7 @@ export class HoursImportService {
       // Provide all users as candidates for manual selection
       const candidates = users.map(u => ({
         id: u.id,
-        name: `${u.firstName} ${u.lastName}`,
+        name: `${u.firstName} ${u.lastName}`.trim(),
       }));
 
       return {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/lib/auth'
 import { api } from '@/lib/api'
@@ -8,6 +8,8 @@ import { useToast } from '@/components/ui/use-toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -31,10 +33,12 @@ import {
   ChevronUp,
   UserPlus,
   UserCheck,
+  Calendar,
 } from 'lucide-react'
 
 interface WorkerMatch {
   name: string
+  category: string
   matchedUserId: string | null
   matchedUserName: string | null
   matchStatus: 'matched' | 'partial' | 'unmatched'
@@ -70,6 +74,29 @@ interface Employee {
 
 type Step = 'upload' | 'preview' | 'success'
 
+// Map Hebrew category names to display labels
+const CATEGORY_LABELS: { [key: string]: { label: string; color: string } } = {
+  'מלצר': { label: 'מלצר', color: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' },
+  'מלצרית': { label: 'מלצרית', color: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' },
+  'אחמשית': { label: 'אחמשית', color: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300' },
+  'אח"מ': { label: 'אח"מ', color: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300' },
+  'טבח': { label: 'טבח', color: 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300' },
+  'טבחית': { label: 'טבחית', color: 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300' },
+  'שוטף': { label: 'שוטף כלים', color: 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300' },
+  'שוטף כלים': { label: 'שוטף כלים', color: 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300' },
+}
+
+/**
+ * Get the Sunday (start of week) for a given date.
+ * The Israeli work week starts on Sunday.
+ */
+function getWeekStartDate(date: Date): string {
+  const d = new Date(date)
+  const day = d.getDay() // 0=Sunday
+  d.setDate(d.getDate() - day)
+  return d.toISOString().split('T')[0]
+}
+
 export default function ImportHoursPage() {
   const { accessToken } = useAuthStore()
   const { toast } = useToast()
@@ -82,6 +109,8 @@ export default function ImportHoursPage() {
   const [workerMapping, setWorkerMapping] = useState<{ [name: string]: string }>({})
   const [expandedWorkers, setExpandedWorkers] = useState<Set<string>>(new Set())
   const [applyResult, setApplyResult] = useState<any>(null)
+  const [weekStartDate, setWeekStartDate] = useState<string>(getWeekStartDate(new Date()))
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   // Fetch employees list for manual matching
   const { data: employees = [] } = useQuery<Employee[]>({
@@ -95,6 +124,7 @@ export default function ImportHoursPage() {
     mutationFn: async (file: File) => {
       const formData = new FormData()
       formData.append('file', file)
+      formData.append('weekStartDate', weekStartDate)
       return api.upload<ImportPreview>('/hours-import/upload', formData, accessToken!)
     },
     onSuccess: (data) => {
@@ -128,7 +158,7 @@ export default function ImportHoursPage() {
       if (!preview) throw new Error('No preview data')
       return api.post(
         `/hours-import/apply/${preview.sessionId}`,
-        { workerMapping },
+        { workerMapping, weekStartDate },
         accessToken!,
       )
     },
@@ -138,12 +168,15 @@ export default function ImportHoursPage() {
       queryClient.invalidateQueries({ queryKey: ['assignments'] })
       queryClient.invalidateQueries({ queryKey: ['users'] })
       queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      queryClient.invalidateQueries({ queryKey: ['schedules'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
       const created = data.summary?.created || 0
+      const assignments = data.summary?.assignmentsCreated || 0
       toast({
         title: 'העדכון הושלם בהצלחה',
         description: created > 0
-          ? `${created} עובדים חדשים נוצרו - נשלחה התראה להשלמת הפרטים`
-          : undefined,
+          ? `${created} עובדים חדשים נוצרו, ${assignments} משמרות נרשמו`
+          : `${assignments} משמרות נרשמו בהצלחה`,
       })
     },
     onError: (error: any) => {
@@ -175,6 +208,7 @@ export default function ImportHoursPage() {
       })
       return
     }
+    setSelectedFile(file)
     uploadMutation.mutate(file)
   }, [uploadMutation, toast])
 
@@ -227,11 +261,36 @@ export default function ImportHoursPage() {
     setWorkerMapping({})
     setExpandedWorkers(new Set())
     setApplyResult(null)
+    setSelectedFile(null)
   }
 
   const mappedCount = Object.keys(workerMapping).filter(k => workerMapping[k]).length
   const totalWorkers = preview?.summary.totalWorkers || 0
   const unmappedCount = totalWorkers - mappedCount
+
+  // Format the week date for display
+  const weekDisplayDate = useMemo(() => {
+    if (!weekStartDate) return ''
+    const start = new Date(weekStartDate)
+    const end = new Date(start)
+    end.setDate(end.getDate() + 6)
+    const fmt = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}`
+    return `${fmt(start)} - ${fmt(end)}`
+  }, [weekStartDate])
+
+  // Hebrew day letter to actual date mapping for display
+  const dayToDate = useMemo(() => {
+    if (!weekStartDate) return {}
+    const map: { [key: string]: string } = {}
+    const days = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש']
+    const start = new Date(weekStartDate)
+    days.forEach((day, idx) => {
+      const d = new Date(start)
+      d.setDate(d.getDate() + idx)
+      map[day] = `${d.getDate()}/${d.getMonth() + 1}`
+    })
+    return map
+  }, [weekStartDate])
 
   return (
     <PageTransition>
@@ -284,6 +343,45 @@ export default function ImportHoursPage() {
         {/* ==================== STEP 1: UPLOAD ==================== */}
         {step === 'upload' && (
           <FadeIn>
+            {/* Week date picker */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  לאיזה שבוע מתייחס הקובץ?
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  <div className="flex items-center gap-2 flex-1">
+                    <Label htmlFor="weekStart" className="whitespace-nowrap text-sm">תחילת שבוע (יום ראשון):</Label>
+                    <Input
+                      id="weekStart"
+                      type="date"
+                      value={weekStartDate}
+                      onChange={(e) => {
+                        // Snap to the nearest Sunday
+                        const d = new Date(e.target.value)
+                        if (!isNaN(d.getTime())) {
+                          setWeekStartDate(getWeekStartDate(d))
+                        }
+                      }}
+                      className="max-w-[200px]"
+                    />
+                  </div>
+                  {weekStartDate && (
+                    <Badge variant="secondary" className="text-sm">
+                      שבוע: {weekDisplayDate}
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  התאריך ישמש להמרת ימים (א&apos;-ש&apos;) לתאריכים בפועל ולשיוך המשמרות ללוח
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Upload area */}
             <Card>
               <CardContent className="p-4 sm:p-6">
                 <div
@@ -343,11 +441,12 @@ export default function ImportHoursPage() {
             {/* Help text */}
             <Card className="bg-muted/50">
               <CardContent className="p-4">
-                <h3 className="font-medium text-sm mb-2">📋 מה הקובץ צריך להכיל?</h3>
+                <h3 className="font-medium text-sm mb-2">מה הקובץ צריך להכיל?</h3>
                 <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
                   <li>שמות העובדים</li>
                   <li>שעות כניסה ויציאה לכל משמרת</li>
                   <li>סה&quot;כ שעות עבודה</li>
+                  <li>מחלקה (מלצר/טבח/שוטף) - אם קיים</li>
                   <li>חלוקה לפי אחוזים (100%, 125%, 150%) - אם קיים</li>
                 </ul>
               </CardContent>
@@ -358,6 +457,19 @@ export default function ImportHoursPage() {
         {/* ==================== STEP 2: PREVIEW ==================== */}
         {step === 'preview' && preview && (
           <FadeIn>
+            {/* Week info banner */}
+            {weekStartDate && (
+              <Card className="bg-primary/5 border-primary/20">
+                <CardContent className="p-3 flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">שבוע: {weekDisplayDate}</span>
+                  <span className="text-xs text-muted-foreground">
+                    (המשמרות יירשמו ללוח בתאריכים אלו)
+                  </span>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Summary cards */}
             <StaggerContainer className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <StaggerItem>
@@ -425,6 +537,7 @@ export default function ImportHoursPage() {
                 const isExpanded = expandedWorkers.has(worker.name)
                 const currentMapping = workerMapping[worker.name]
                 const isMatched = !!currentMapping
+                const categoryInfo = worker.category ? CATEGORY_LABELS[worker.category] : null
                 const statusIcon = isMatched ? (
                   <div className="flex flex-col items-center gap-0.5">
                     <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
@@ -448,6 +561,16 @@ export default function ImportHoursPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-base">{worker.name}</span>
+                            {categoryInfo && (
+                              <Badge className={`text-xs ${categoryInfo.color} border-0`}>
+                                {categoryInfo.label}
+                              </Badge>
+                            )}
+                            {worker.category && !categoryInfo && (
+                              <Badge variant="outline" className="text-xs">
+                                {worker.category}
+                              </Badge>
+                            )}
                             {isMatched && (
                               <Badge variant="secondary" className="text-xs gap-1">
                                 <UserCheck className="h-3 w-3" />
@@ -495,7 +618,7 @@ export default function ImportHoursPage() {
                               <SelectValue placeholder="בחר עובד..." />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="none">-- לא משויך --</SelectItem>
+                              <SelectItem value="none">-- לא משויך (ייוצר חדש) --</SelectItem>
                               {employees.map((emp) => (
                                 <SelectItem key={emp.id} value={emp.id}>
                                   {emp.name} {emp.category && `(${emp.category})`}
@@ -516,7 +639,10 @@ export default function ImportHoursPage() {
                                   className="flex items-center justify-between bg-background rounded-lg px-3 py-2 text-sm border"
                                 >
                                   <div className="flex items-center gap-2">
-                                    <span className="font-medium">יום {shift.day}</span>
+                                    <span className="font-medium">יום {shift.day}&apos;</span>
+                                    {dayToDate[shift.day] && (
+                                      <span className="text-xs text-muted-foreground">({dayToDate[shift.day]})</span>
+                                    )}
                                     {shift.startTime && shift.endTime && (
                                       <span className="text-muted-foreground">
                                         {shift.startTime}-{shift.endTime}
@@ -631,6 +757,12 @@ export default function ImportHoursPage() {
                       <div className="flex items-center justify-center gap-2">
                         <UserPlus className="h-4 w-4 text-blue-500" />
                         <span>נוצרו {applyResult.summary.created} עובדים חדשים</span>
+                      </div>
+                    )}
+                    {(applyResult.summary?.assignmentsCreated || 0) > 0 && (
+                      <div className="flex items-center justify-center gap-2">
+                        <Calendar className="h-4 w-4 text-purple-500" />
+                        <span>נרשמו {applyResult.summary.assignmentsCreated} משמרות ללוח</span>
                       </div>
                     )}
                     <p>סה&quot;כ {applyResult.summary?.totalHours?.toFixed(1) || 0} שעות</p>

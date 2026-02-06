@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsOptional, Min, Max, ArrayMinSize, ArrayMaxSize } from 'class-validator';
+import { IsArray, IsInt, IsNumber, IsOptional, Min, Max, ArrayMinSize, ArrayMaxSize } from 'class-validator';
 
 export class UpdateSettingsDto {
   @IsArray()
@@ -26,4 +26,9 @@ export class UpdateSettingsDto {
     day: number; // 0=Sunday, 6=Saturday
     shiftTypes: string[]; // ['MORNING', 'EVENING', 'EVENING_CLOSE']
   }>;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  defaultHourlyWage?: number;
 }

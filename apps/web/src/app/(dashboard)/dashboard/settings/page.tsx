@@ -17,6 +17,7 @@ import {
 import { useToast } from '@/components/ui/use-toast'
 import { api } from '@/lib/api'
 import { useAuthStore, isAdmin } from '@/lib/auth'
+import { Input } from '@/components/ui/input'
 import { Loader2, Save } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -51,6 +52,7 @@ interface SettingsFormData {
   submissionDeadlineDay: number
   submissionDeadlineHour: number
   closedPeriods: ClosedPeriod[]
+  defaultHourlyWage: number
 }
 
 export default function SettingsPage() {
@@ -79,6 +81,7 @@ export default function SettingsPage() {
       submissionDeadlineDay: 3,
       submissionDeadlineHour: 18,
       closedPeriods: [],
+      defaultHourlyWage: 30,
     },
   })
 
@@ -92,6 +95,7 @@ export default function SettingsPage() {
         submissionDeadlineDay: settings.submissionDeadlineDay ?? 3,
         submissionDeadlineHour: settings.submissionDeadlineHour ?? 18,
         closedPeriods: settings.closedPeriods || [],
+        defaultHourlyWage: settings.defaultHourlyWage ?? 30,
       })
     }
   }, [settings, reset])
@@ -267,6 +271,28 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Default Hourly Wage */}
+          <Card>
+            <CardHeader>
+              <CardTitle>שכר שעתי ברירת מחדל</CardTitle>
+              <CardDescription>
+                שכר שעתי שייקבע אוטומטית לעובדים חדשים שנוצרים מהעלאת קובץ שעות
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3 max-w-xs">
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  {...register('defaultHourlyWage', { valueAsNumber: true })}
+                  className="text-lg h-11"
+                />
+                <span className="text-muted-foreground text-sm whitespace-nowrap">₪ לשעה</span>
               </div>
             </CardContent>
           </Card>

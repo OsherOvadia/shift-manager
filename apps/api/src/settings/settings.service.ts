@@ -68,6 +68,9 @@ export class SettingsService {
     if (updateDto.closedPeriods !== undefined) {
       dataToSave.closedPeriods = updateDto.closedPeriods;
     }
+    if (updateDto.defaultHourlyWage !== undefined) {
+      dataToSave.defaultHourlyWage = updateDto.defaultHourlyWage;
+    }
 
     if (!settings) {
       // Create with provided values
