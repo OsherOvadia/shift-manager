@@ -122,19 +122,19 @@ export default function DashboardPage() {
           </p>
         </motion.div>
 
-        {/* Quick Stats */}
-        <StaggerContainer className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
+        {/* Quick Stats - MOBILE OPTIMIZED */}
+        <StaggerContainer className="grid grid-cols-1 xs:grid-cols-2 gap-4 lg:grid-cols-5">
           {!isManagerRole && (
             <>
               <StaggerItem>
-                <Card className="h-full">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-2">
-                    <CardTitle className="text-xs sm:text-sm font-medium leading-tight">המשמרות שלי השבוע</CardTitle>
-                    <Calendar className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                <Card className="h-full hover:shadow-md transition-shadow cursor-pointer active:scale-[0.98]">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 sm:p-5 pb-3">
+                    <CardTitle className="text-sm sm:text-base font-semibold">המשמרות שלי השבוע</CardTitle>
+                    <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500 flex-shrink-0" />
                   </CardHeader>
-                  <CardContent className="p-3 sm:p-4 pt-0">
-                    <div className="text-xl sm:text-2xl font-bold text-blue-600">{myShiftsCount}</div>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">
+                  <CardContent className="p-4 sm:p-5 pt-0">
+                    <div className="text-3xl sm:text-4xl font-bold text-blue-600">{myShiftsCount}</div>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                       משמרות מתוכננות
                     </p>
                   </CardContent>

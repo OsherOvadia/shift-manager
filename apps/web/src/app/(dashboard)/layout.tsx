@@ -83,42 +83,18 @@ export default function DashboardLayout({
   }, [])
 
   useEffect(() => {
-    console.log('🔐 Auth check:', { 
-      mounted, 
-      _hasHydrated, 
-      isAuthenticated, 
-      hasUser: !!user,
-      isRefreshing,
-      hasRefreshToken: !!refreshToken,
-      hasAccessToken: !!accessToken
-    })
-    
     // Wait for mount, hydration, AND token refresh
     if (!mounted || !_hasHydrated || isRefreshing) {
-      console.log('⏳ Still mounting/hydrating/refreshing...')
       return
     }
     
-    // Give more time to fully hydrate before checking
-    const timer = setTimeout(() => {
-      const state = useAuthStore.getState()
-      console.log('🔍 Final auth state:', {
-        isAuthenticated: state.isAuthenticated,
-        hasUser: !!state.user,
-        hasTokens: !!state.accessToken && !!state.refreshToken
-      })
-      
-      setAuthChecked(true)
-      
-      if (!state.isAuthenticated || !state.user) {
-        console.log('❌ Not authenticated after hydration, redirecting to login')
-        router.push('/login')
-      } else {
-        console.log('✅ Authenticated, staying on page')
-      }
-    }, 500) // Increased delay for token refresh
+    // Quick auth check without delay - much faster!
+    const state = useAuthStore.getState()
+    setAuthChecked(true)
     
-    return () => clearTimeout(timer)
+    if (!state.isAuthenticated || !state.user) {
+      router.push('/login')
+    }
   }, [mounted, _hasHydrated, isRefreshing, router])
 
   // Show loading while waiting for hydration, refresh, and auth check

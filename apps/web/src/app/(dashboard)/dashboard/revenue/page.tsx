@@ -553,112 +553,228 @@ export default function RevenuePage() {
                                   </div>
                                 </div>
 
-                                {/* Shift Revenue & Tips Inputs */}
+                                {/* Shift Revenue & Tips Inputs - ENHANCED FOR MOBILE */}
                                 <div className="space-y-4">
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    {/* Sitting Revenue */}
-                                    <div className="space-y-2">
-                                      <Label className="text-base font-semibold flex items-center gap-2 text-blue-600">
-                                        <Utensils className="h-5 w-5" />
-                                        ישיבה (₪)
-                                      </Label>
-                                      <Input
-                                        type="number"
-                                        placeholder="הזן סכום"
-                                        value={sittingRevenue[shiftKey] || ''}
-                                        onChange={(e) => setSittingRevenue(prev => ({
-                                          ...prev,
-                                          [shiftKey]: e.target.value
-                                        }))}
-                                        className="h-12 text-lg"
-                                        min="0"
-                                      />
+                                  {/* Real-time Total Calculation Display */}
+                                  <motion.div 
+                                    className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 p-4 rounded-xl border-2 border-emerald-200 dark:border-emerald-800"
+                                    initial={{ scale: 0.95, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    transition={{ duration: 0.3 }}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">סה"כ הכנסות משמרת:</span>
+                                      <motion.span 
+                                        key={`${sittingRevenue[shiftKey]}-${takeawayRevenue[shiftKey]}-${deliveryRevenue[shiftKey]}-${tips[shiftKey]}`}
+                                        className="text-2xl sm:text-3xl font-bold text-emerald-700 dark:text-emerald-400"
+                                        initial={{ scale: 1.3, color: '#10b981' }}
+                                        animate={{ scale: 1, color: 'inherit' }}
+                                        transition={{ duration: 0.3 }}
+                                      >
+                                        {formatCurrency(
+                                          (parseFloat(sittingRevenue[shiftKey] || '0') +
+                                           parseFloat(takeawayRevenue[shiftKey] || '0') +
+                                           parseFloat(deliveryRevenue[shiftKey] || '0') +
+                                           parseFloat(tips[shiftKey] || '0'))
+                                        )}
+                                      </motion.span>
                                     </div>
+                                  </motion.div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                    {/* Sitting Revenue */}
+                                    <motion.div 
+                                      className="space-y-2"
+                                      whileTap={{ scale: 0.98 }}
+                                    >
+                                      <Label className="text-base sm:text-lg font-semibold flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                                        <Utensils className="h-5 w-5 sm:h-6 sm:w-6" />
+                                        ישיבה
+                                      </Label>
+                                      <div className="relative">
+                                        <Input
+                                          type="number"
+                                          inputMode="decimal"
+                                          placeholder="0"
+                                          value={sittingRevenue[shiftKey] || ''}
+                                          onChange={(e) => setSittingRevenue(prev => ({
+                                            ...prev,
+                                            [shiftKey]: e.target.value
+                                          }))}
+                                          className="h-14 sm:h-16 text-xl sm:text-2xl font-semibold pr-12 border-2 focus:border-blue-500 transition-colors"
+                                          min="0"
+                                        />
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-muted-foreground font-medium">₪</span>
+                                      </div>
+                                      {sittingRevenue[shiftKey] && parseFloat(sittingRevenue[shiftKey]) > 0 && (
+                                        <motion.p 
+                                          initial={{ opacity: 0, y: -5 }}
+                                          animate={{ opacity: 1, y: 0 }}
+                                          className="text-sm text-blue-600 dark:text-blue-400 font-medium"
+                                        >
+                                          {formatCurrency(parseFloat(sittingRevenue[shiftKey]))}
+                                        </motion.p>
+                                      )}
+                                    </motion.div>
                                     
                                     {/* Takeaway Revenue */}
-                                    <div className="space-y-2">
-                                      <Label className="text-base font-semibold flex items-center gap-2 text-purple-600">
-                                        <Receipt className="h-5 w-5" />
-                                        TA (₪)
+                                    <motion.div 
+                                      className="space-y-2"
+                                      whileTap={{ scale: 0.98 }}
+                                    >
+                                      <Label className="text-base sm:text-lg font-semibold flex items-center gap-2 text-purple-600 dark:text-purple-400">
+                                        <Receipt className="h-5 w-5 sm:h-6 sm:w-6" />
+                                        TA
                                       </Label>
-                                      <Input
-                                        type="number"
-                                        placeholder="הזן סכום"
-                                        value={takeawayRevenue[shiftKey] || ''}
-                                        onChange={(e) => setTakeawayRevenue(prev => ({
-                                          ...prev,
-                                          [shiftKey]: e.target.value
-                                        }))}
-                                        className="h-12 text-lg"
-                                        min="0"
-                                      />
-                                    </div>
+                                      <div className="relative">
+                                        <Input
+                                          type="number"
+                                          inputMode="decimal"
+                                          placeholder="0"
+                                          value={takeawayRevenue[shiftKey] || ''}
+                                          onChange={(e) => setTakeawayRevenue(prev => ({
+                                            ...prev,
+                                            [shiftKey]: e.target.value
+                                          }))}
+                                          className="h-14 sm:h-16 text-xl sm:text-2xl font-semibold pr-12 border-2 focus:border-purple-500 transition-colors"
+                                          min="0"
+                                        />
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-muted-foreground font-medium">₪</span>
+                                      </div>
+                                      {takeawayRevenue[shiftKey] && parseFloat(takeawayRevenue[shiftKey]) > 0 && (
+                                        <motion.p 
+                                          initial={{ opacity: 0, y: -5 }}
+                                          animate={{ opacity: 1, y: 0 }}
+                                          className="text-sm text-purple-600 dark:text-purple-400 font-medium"
+                                        >
+                                          {formatCurrency(parseFloat(takeawayRevenue[shiftKey]))}
+                                        </motion.p>
+                                      )}
+                                    </motion.div>
                                     
                                     {/* Delivery Revenue */}
-                                    <div className="space-y-2">
-                                      <Label className="text-base font-semibold flex items-center gap-2 text-orange-600">
-                                        <Clock className="h-5 w-5" />
-                                        משלוחים (₪)
+                                    <motion.div 
+                                      className="space-y-2"
+                                      whileTap={{ scale: 0.98 }}
+                                    >
+                                      <Label className="text-base sm:text-lg font-semibold flex items-center gap-2 text-orange-600 dark:text-orange-400">
+                                        <Clock className="h-5 w-5 sm:h-6 sm:w-6" />
+                                        משלוחים
                                       </Label>
-                                      <Input
-                                        type="number"
-                                        placeholder="הזן סכום"
-                                        value={deliveryRevenue[shiftKey] || ''}
-                                        onChange={(e) => setDeliveryRevenue(prev => ({
-                                          ...prev,
-                                          [shiftKey]: e.target.value
-                                        }))}
-                                        className="h-12 text-lg"
-                                        min="0"
-                                      />
-                                    </div>
+                                      <div className="relative">
+                                        <Input
+                                          type="number"
+                                          inputMode="decimal"
+                                          placeholder="0"
+                                          value={deliveryRevenue[shiftKey] || ''}
+                                          onChange={(e) => setDeliveryRevenue(prev => ({
+                                            ...prev,
+                                            [shiftKey]: e.target.value
+                                          }))}
+                                          className="h-14 sm:h-16 text-xl sm:text-2xl font-semibold pr-12 border-2 focus:border-orange-500 transition-colors"
+                                          min="0"
+                                        />
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-muted-foreground font-medium">₪</span>
+                                      </div>
+                                      {deliveryRevenue[shiftKey] && parseFloat(deliveryRevenue[shiftKey]) > 0 && (
+                                        <motion.p 
+                                          initial={{ opacity: 0, y: -5 }}
+                                          animate={{ opacity: 1, y: 0 }}
+                                          className="text-sm text-orange-600 dark:text-orange-400 font-medium"
+                                        >
+                                          {formatCurrency(parseFloat(deliveryRevenue[shiftKey]))}
+                                        </motion.p>
+                                      )}
+                                    </motion.div>
                                     
-                                    {/* Tips */}
-                                    <div className="space-y-2">
-                                      <Label className="text-base font-semibold flex items-center gap-2 text-amber-600">
-                                        <Coins className="h-5 w-5" />
-                                        טיפ כרטיס (₪)
+                                    {/* Card Tips */}
+                                    <motion.div 
+                                      className="space-y-2"
+                                      whileTap={{ scale: 0.98 }}
+                                    >
+                                      <Label className="text-base sm:text-lg font-semibold flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                                        <Coins className="h-5 w-5 sm:h-6 sm:w-6" />
+                                        טיפ כרטיס
                                       </Label>
-                                      <Input
-                                        type="number"
-                                        placeholder="הזן סכום"
-                                        value={tips[shiftKey] || ''}
-                                        onChange={(e) => setTips(prev => ({
-                                          ...prev,
-                                          [shiftKey]: e.target.value
-                                        }))}
-                                        className="h-12 text-lg"
-                                        min="0"
-                                      />
-                                    </div>
+                                      <div className="relative">
+                                        <Input
+                                          type="number"
+                                          inputMode="decimal"
+                                          placeholder="0"
+                                          value={tips[shiftKey] || ''}
+                                          onChange={(e) => setTips(prev => ({
+                                            ...prev,
+                                            [shiftKey]: e.target.value
+                                          }))}
+                                          className="h-14 sm:h-16 text-xl sm:text-2xl font-semibold pr-12 border-2 focus:border-amber-500 transition-colors"
+                                          min="0"
+                                        />
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-muted-foreground font-medium">₪</span>
+                                      </div>
+                                      {tips[shiftKey] && parseFloat(tips[shiftKey]) > 0 && (
+                                        <motion.p 
+                                          initial={{ opacity: 0, y: -5 }}
+                                          animate={{ opacity: 1, y: 0 }}
+                                          className="text-sm text-amber-600 dark:text-amber-400 font-medium"
+                                        >
+                                          {formatCurrency(parseFloat(tips[shiftKey]))}
+                                        </motion.p>
+                                      )}
+                                    </motion.div>
                                   </div>
 
-                                  {/* Cash Tips Per Worker */}
-                                  <div className="mt-4 pt-4 border-t">
-                                    <Label className="text-base font-semibold flex items-center gap-2 text-green-600 mb-3">
-                                      <DollarSign className="h-5 w-5" />
+                                  {/* Cash Tips Per Worker - MOBILE OPTIMIZED */}
+                                  <div className="mt-6 pt-6 border-t-2">
+                                    <Label className="text-base sm:text-lg font-bold flex items-center gap-2 text-green-600 dark:text-green-400 mb-4">
+                                      <DollarSign className="h-6 w-6" />
                                       טיפים מזומן לכל מלצר
                                     </Label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-1 gap-3">
                                       {shiftGroup.workers.map((worker: any, idx: number) => {
                                         const assignmentId = shiftGroup.assignmentIds[idx]
+                                        const cashTipValue = cashTips[assignmentId] || ''
                                         return (
-                                          <div key={assignmentId} className="space-y-1.5 bg-background/50 p-3 rounded-lg">
-                                            <Label className="text-sm font-medium text-muted-foreground">
-                                              {worker.firstName} {worker.lastName}
-                                            </Label>
-                                            <Input
-                                              type="number"
-                                              placeholder="0"
-                                              value={cashTips[assignmentId] || ''}
-                                              onChange={(e) => setCashTips(prev => ({
-                                                ...prev,
-                                                [assignmentId]: e.target.value
-                                              }))}
-                                              className="h-10 text-base"
-                                              min="0"
-                                            />
-                                          </div>
+                                          <motion.div 
+                                            key={assignmentId} 
+                                            className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 p-4 rounded-xl border-2 border-green-200 dark:border-green-800"
+                                            whileTap={{ scale: 0.98 }}
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: idx * 0.05 }}
+                                          >
+                                            <div className="flex items-center justify-between gap-3 mb-2">
+                                              <Label className="text-base sm:text-lg font-bold text-green-700 dark:text-green-400 flex items-center gap-2">
+                                                <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center text-sm font-bold">
+                                                  {worker.firstName[0]}{worker.lastName[0]}
+                                                </div>
+                                                {worker.firstName} {worker.lastName}
+                                              </Label>
+                                            </div>
+                                            <div className="relative">
+                                              <Input
+                                                type="number"
+                                                inputMode="decimal"
+                                                placeholder="0"
+                                                value={cashTipValue}
+                                                onChange={(e) => setCashTips(prev => ({
+                                                  ...prev,
+                                                  [assignmentId]: e.target.value
+                                                }))}
+                                                className="h-14 text-xl font-bold pr-12 border-2 focus:border-green-500 bg-white dark:bg-slate-950"
+                                                min="0"
+                                              />
+                                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-muted-foreground font-medium">₪</span>
+                                            </div>
+                                            {cashTipValue && parseFloat(cashTipValue) > 0 && (
+                                              <motion.p 
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                className="text-sm text-green-600 dark:text-green-400 font-bold mt-2"
+                                              >
+                                                ✓ {formatCurrency(parseFloat(cashTipValue))}
+                                              </motion.p>
+                                            )}
+                                          </motion.div>
                                         )
                                       })}
                                     </div>
