@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { useAuthStore, isManager } from '@/lib/auth'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { startOfWeek, addWeeks } from 'date-fns'
 import {
   Calendar,
@@ -26,6 +27,18 @@ import { PageTransition, StaggerContainer, StaggerItem, motion } from '@/compone
 export default function DashboardPage() {
   const { user, accessToken } = useAuthStore()
   const isManagerRole = isManager()
+  const router = useRouter()
+
+  // Redirect kitchen staff to their dedicated dashboard
+  useEffect(() => {
+    if (user && !isManagerRole) {
+      const isKitchenStaff = user.jobCategory?.name === 'cook' || user.jobCategory?.name === 'sushi'
+      if (isKitchenStaff) {
+        router.push('/dashboard/kitchen')
+        return
+      }
+    }
+  }, [user, isManagerRole, router])
   
   // Get current week start date
   const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 })

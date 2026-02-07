@@ -328,37 +328,56 @@ export class ReportsService {
       };
     });
 
-    // Add cook payroll costs (cooks are NOT tip-based, full salary paid by owner)
-    const cookCosts = cookPayroll.map(cook => ({
-      user: cook.user,
-      totalHours: cook.totalHours,
-      totalCost: cook.totalEarnings, // Full earnings paid by owner
-      totalTips: 0, // Cooks don't receive tips
-      managerPayment: cook.totalEarnings, // Full payment by owner
-      tipsCoverSalary: false,
-      baseWageTotal: cook.totalEarnings,
-      totalWorkerPayment: cook.totalEarnings,
-      hourlyWage: cook.hourlyWage,
-      notes: cook.notes,
-      shifts: [], // Cooks don't have shift assignments
-    }));
-
+    // Merge cook payroll costs into employeeCosts (avoid duplicates)
+    // If a cook already has shift assignments, merge their payroll data
+    // Otherwise, add them as a new entry
     const totalCookHours = cookPayroll.reduce((sum, c) => sum + c.totalHours, 0);
     const totalCookCost = cookPayroll.reduce((sum, c) => sum + c.totalEarnings, 0);
 
-    // Add cooks to byEmployee array
-    const allEmployees = [
-      ...Array.from(employeeCosts.values()),
-      ...cookCosts,
-    ].sort((a, b) => b.totalCost - a.totalCost);
-
-    // Add cooks to byCategory
     for (const cook of cookPayroll) {
-      const categoryId = cook.user.jobCategory?.id || 'uncategorized';
+      if (employeeCosts.has(cook.user.id)) {
+        // Cook already exists (has shift assignments) - merge payroll data
+        const existing = employeeCosts.get(cook.user.id)!;
+        existing.totalHours += cook.totalHours;
+        existing.totalCost += cook.totalEarnings;
+        existing.managerPayment += cook.totalEarnings;
+        existing.baseWageTotal += cook.totalEarnings;
+        existing.totalWorkerPayment += cook.totalEarnings;
+        
+        console.log(`[Reports] Merged cook payroll for ${cook.user.firstName} (${cook.user.id})`);
+      } else {
+        // New cook (no shift assignments) - add as new entry
+        employeeCosts.set(cook.user.id, {
+          user: cook.user,
+          totalHours: cook.totalHours,
+          totalCost: cook.totalEarnings,
+          totalTips: 0,
+          managerPayment: cook.totalEarnings,
+          tipsCoverSalary: false,
+          baseWageTotal: cook.totalEarnings,
+          totalWorkerPayment: cook.totalEarnings,
+          shifts: [],
+        });
+        
+        console.log(`[Reports] Added new cook ${cook.user.firstName} (${cook.user.id}) from payroll only`);
+      }
+    }
+
+    // Convert to array (now includes merged cook data, no duplicates)
+    const allEmployees = Array.from(employeeCosts.values())
+      .sort((a, b) => b.totalCost - a.totalCost);
+    
+    console.log(`[Reports] Total unique employees: ${allEmployees.length}`);
+
+    // Update byCategory with cook payroll data (already merged into employeeCosts above)
+    // Rebuild category costs from the merged employeeCosts to avoid double-counting
+    categoryCosts.clear();
+    for (const [, record] of employeeCosts) {
+      const categoryId = record.user.jobCategory?.id || 'uncategorized';
       
       if (!categoryCosts.has(categoryId)) {
         categoryCosts.set(categoryId, {
-          category: cook.user.jobCategory || { id: 'uncategorized', name: 'Uncategorized', nameHe: 'ללא קטגוריה', color: '#6b7280' },
+          category: record.user.jobCategory || { id: 'uncategorized', name: 'Uncategorized', nameHe: 'ללא קטגוריה', color: '#6b7280' },
           totalHours: 0,
           totalCost: 0,
           employeeCount: 0,
@@ -366,8 +385,8 @@ export class ReportsService {
       }
 
       const catRecord = categoryCosts.get(categoryId)!;
-      catRecord.totalHours += cook.totalHours;
-      catRecord.totalCost += cook.totalEarnings;
+      catRecord.totalHours += record.totalHours;
+      catRecord.totalCost += record.totalCost;
       catRecord.employeeCount += 1;
     }
 
@@ -378,6 +397,11 @@ export class ReportsService {
     const overallProfitMargin = totalRevenue > 0 ? ((totalRevenue - totalCostWithCooks) / totalRevenue) * 100 : 0;
     const overallSalaryPercentage = totalRevenue > 0 ? (totalCostWithCooks / totalRevenue) * 100 : 0;
 
+    // Extract kitchen staff from merged allEmployees for cookPayroll section
+    const cookCosts = allEmployees.filter(emp => 
+      emp.user.jobCategory?.name === 'cook' || emp.user.jobCategory?.name === 'sushi'
+    );
+
     return {
       weekStartDate: startDate,
       summary: {
@@ -387,7 +411,7 @@ export class ReportsService {
         totalRevenue,
         profitMargin: overallProfitMargin,
         salaryPercentage: overallSalaryPercentage,
-        employeeCount: employeeCosts.size + cookPayroll.length,
+        employeeCount: employeeCosts.size, // Now includes all employees (merged)
         shiftCount: assignments.length,
         // Separate breakdown
         waiterHours: totalHours,
@@ -719,6 +743,68 @@ export class ReportsService {
       weekStart: weekStart.toISOString(),
       monthStart: monthStart.toISOString(),
     };
+  }
+
+  /**
+   * Get kitchen staff monthly summary (total hours and earnings)
+   */
+  async getKitchenMonthlySummary(userId: string, organizationId: string, year: number, month: number) {
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 1);
+
+    // Get all cook payroll records for this month
+    const cookPayroll = await this.prisma.cookWeeklyHours.findMany({
+      where: {
+        userId,
+        organizationId,
+        weekStart: {
+          gte: monthStart,
+          lt: monthEnd,
+        },
+      },
+    });
+
+    const totalHours = cookPayroll.reduce((sum, record) => sum + record.totalHours, 0);
+    const totalEarnings = cookPayroll.reduce((sum, record) => sum + record.totalEarnings, 0);
+
+    return {
+      year,
+      month,
+      totalHours: Math.round(totalHours * 100) / 100,
+      totalEarnings: Math.round(totalEarnings * 100) / 100,
+      weeks: cookPayroll.length,
+    };
+  }
+
+  /**
+   * Get kitchen staff recent weeks (last 8 weeks)
+   */
+  async getKitchenRecentWeeks(userId: string, organizationId: string) {
+    const today = new Date();
+    const eightWeeksAgo = new Date(today);
+    eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56); // 8 weeks
+
+    const cookPayroll = await this.prisma.cookWeeklyHours.findMany({
+      where: {
+        userId,
+        organizationId,
+        weekStart: {
+          gte: eightWeeksAgo,
+        },
+      },
+      orderBy: {
+        weekStart: 'desc',
+      },
+      take: 8,
+    });
+
+    return cookPayroll.map(record => ({
+      weekStart: record.weekStart,
+      totalHours: Math.round(record.totalHours * 100) / 100,
+      totalEarnings: Math.round(record.totalEarnings * 100) / 100,
+      hourlyWage: record.hourlyWage,
+      notes: record.notes,
+    }));
   }
 
   private normalizeToWeekStart(date: Date): Date {

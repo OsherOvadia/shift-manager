@@ -56,4 +56,34 @@ export class ReportsController {
       m,
     );
   }
+
+  /**
+   * Get kitchen staff monthly summary - accessible by kitchen staff themselves
+   */
+  @Get('kitchen-monthly-summary')
+  getKitchenMonthlySummary(
+    @Query('year') year: string,
+    @Query('month') month: string,
+    @Request() req: any,
+  ) {
+    const y = year ? parseInt(year, 10) : new Date().getFullYear();
+    const m = month ? parseInt(month, 10) : new Date().getMonth() + 1;
+    return this.reportsService.getKitchenMonthlySummary(
+      req.user.sub,
+      req.user.organizationId,
+      y,
+      m,
+    );
+  }
+
+  /**
+   * Get kitchen staff recent weeks - accessible by kitchen staff themselves
+   */
+  @Get('kitchen-recent-weeks')
+  getKitchenRecentWeeks(@Request() req: any) {
+    return this.reportsService.getKitchenRecentWeeks(
+      req.user.sub,
+      req.user.organizationId,
+    );
+  }
 }
