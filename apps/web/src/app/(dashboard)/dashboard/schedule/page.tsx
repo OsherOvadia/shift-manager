@@ -109,9 +109,22 @@ export default function SchedulePage() {
   const getAssignmentsForDateAndShift = (date: Date, shiftType: string) => {
     if (!scheduleDetails?.shiftAssignments) return []
     const dateStr = date.toISOString().split('T')[0]
+    
+    // Filter to exclude kitchen staff (they appear in separate table)
+    const kitchenCategories = ['cook', 'טבח', 'chef', 'sushiman', 'סושימן', 'sushi', 'kitchen', 'מטבח']
+    
     return scheduleDetails.shiftAssignments.filter((a: any) => {
       const assignmentDate = new Date(a.shiftDate).toISOString().split('T')[0]
-      return assignmentDate === dateStr && a.shiftTemplate.shiftType === shiftType
+      if (assignmentDate !== dateStr || a.shiftTemplate.shiftType !== shiftType) return false
+      
+      // Exclude kitchen staff from main waiter table
+      const categoryName = a.user?.jobCategory?.name?.toLowerCase() || ''
+      const categoryNameHe = a.user?.jobCategory?.nameHe?.toLowerCase() || ''
+      const isKitchen = kitchenCategories.some(kitchen =>
+        categoryName.includes(kitchen) || categoryNameHe.includes(kitchen)
+      )
+      
+      return !isKitchen
     })
   }
 
@@ -275,7 +288,10 @@ export default function SchedulePage() {
                                         {a.user.firstName} {a.user.lastName[0]}.
                                       </div>
                                       {(displayStart || displayEnd) && (
-                                        <div className="text-xs opacity-90 mt-0.5">
+                                        <div className={cn(
+                                          "text-xs mt-0.5",
+                                          a.actualStartTime ? "font-semibold text-green-700 dark:text-green-400" : "opacity-70"
+                                        )}>
                                           {displayStart}-{displayEnd}
                                           {displayHours > 0 && ` (${displayHours.toFixed(1)}ש)`}
                                         </div>

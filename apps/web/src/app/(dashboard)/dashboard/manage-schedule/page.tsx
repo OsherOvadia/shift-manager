@@ -318,9 +318,20 @@ export default function ManageSchedulePage() {
   const getAssignmentsForDateAndShift = (date: Date, shiftType: string) => {
     if (!scheduleDetails?.shiftAssignments) return []
     const dateStr = formatDateLocal(date) // Use local date format
+    
+    // Filter assignments to exclude kitchen staff from waiter table
     return scheduleDetails.shiftAssignments.filter((a: any) => {
       const assignmentDate = a.shiftDate.split('T')[0]
-      return assignmentDate === dateStr && a.shiftTemplate.shiftType === shiftType
+      if (assignmentDate !== dateStr || a.shiftTemplate.shiftType !== shiftType) return false
+      
+      // Exclude kitchen staff (they appear in separate table below)
+      const categoryName = a.user?.jobCategory?.name?.toLowerCase() || ''
+      const categoryNameHe = a.user?.jobCategory?.nameHe?.toLowerCase() || ''
+      const isKitchen = kitchenCategories.some(kitchen =>
+        categoryName.includes(kitchen) || categoryNameHe.includes(kitchen)
+      )
+      
+      return !isKitchen // Only show non-kitchen staff in main table
     })
   }
 
@@ -635,6 +646,17 @@ export default function ManageSchedulePage() {
                                   const displayEnd = a.actualEndTime || scheduledEnd
                                   const displayHours = a.actualHours || calculateHoursFromTimes(scheduledStart, scheduledEnd)
                                   
+                                  // Debug logging
+                                  console.log(`[Assignment] ${a.user.firstName}:`, {
+                                    actualStart: a.actualStartTime,
+                                    actualEnd: a.actualEndTime,
+                                    actualHours: a.actualHours,
+                                    scheduledStart,
+                                    scheduledEnd,
+                                    displayStart,
+                                    displayEnd
+                                  });
+                                  
                                   return (
                                     <div
                                       key={a.id}
@@ -665,22 +687,20 @@ export default function ManageSchedulePage() {
                                         </div>
                                       </div>
                                       {/* Always show times - either actual or scheduled */}
-                                      <div className="text-xs text-muted-foreground mt-1">
-                                        <span className={cn(
-                                          hasActualTimes && a.actualStartTime && a.actualStartTime !== scheduledStart && 'text-amber-600 font-semibold'
-                                        )}>
-                                          {displayStart}
-                                        </span>
-                                        {' - '}
-                                        <span className={cn(
-                                          hasActualTimes && a.actualEndTime && a.actualEndTime !== scheduledEnd && 'text-amber-600 font-semibold'
-                                        )}>
-                                          {displayEnd}
-                                        </span>
-                                        {displayHours > 0 && (
-                                          <span className="mr-1">
-                                            ({displayHours.toFixed(1)}ש)
-                                          </span>
+                                      <div className="text-xs mt-1">
+                                        {a.actualStartTime ? (
+                                          // Show actual times from Excel in green/bold
+                                          <div className="font-semibold text-green-700 dark:text-green-400">
+                                            {displayStart} - {displayEnd}
+                                            {displayHours > 0 && ` (${displayHours.toFixed(1)}ש)`}
+                                          </div>
+                                        ) : (
+                                          // Show template times in muted (means no Excel data)
+                                          <div className="text-muted-foreground">
+                                            {displayStart} - {displayEnd}
+                                            {displayHours > 0 && ` (${displayHours.toFixed(1)}ש)`}
+                                            <span className="text-xs opacity-50"> (ברירת מחדל)</span>
+                                          </div>
                                         )}
                                       </div>
                                     </div>
