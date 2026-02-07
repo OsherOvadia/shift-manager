@@ -97,7 +97,8 @@ export default function ManageSchedulePage() {
     queryKey: ['schedules'],
     queryFn: () => api.get<any[]>('/schedules', accessToken!),
     enabled: !!accessToken,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 0, // Always fetch fresh schedule list after DB resets
+    cacheTime: 0, // Don't cache schedule IDs
   })
 
   // Fetch availability submissions for the week

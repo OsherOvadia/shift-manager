@@ -56,6 +56,8 @@ export default function SchedulePage() {
       return data
     },
     enabled: !!accessToken,
+    staleTime: 0, // Always fetch fresh schedule list
+    cacheTime: 0, // Don't cache schedule IDs
   })
 
   // Find schedule for current week
