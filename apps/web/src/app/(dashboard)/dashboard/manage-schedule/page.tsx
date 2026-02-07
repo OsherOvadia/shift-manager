@@ -424,13 +424,26 @@ export default function ManageSchedulePage() {
   
   const kitchenStaff = useMemo(() => {
     if (!employees) return []
-    return employees.filter(emp => {
+    
+    console.log('[KitchenStaff] Total employees:', employees.length);
+    employees.forEach(emp => {
+      console.log(`[KitchenStaff] ${emp.firstName} ${emp.lastName}: category=${emp.jobCategory?.name}/${emp.jobCategory?.nameHe}`);
+    });
+    
+    const filtered = employees.filter(emp => {
       const categoryName = emp.jobCategory?.name?.toLowerCase() || ''
       const categoryNameHe = emp.jobCategory?.nameHe?.toLowerCase() || ''
-      return kitchenCategories.some(kitchen =>
+      const isKitchen = kitchenCategories.some(kitchen =>
         categoryName.includes(kitchen) || categoryNameHe.includes(kitchen)
-      )
-    })
+      );
+      if (isKitchen) {
+        console.log(`[KitchenStaff] ✅ ${emp.firstName} is kitchen staff (${categoryName}/${categoryNameHe})`);
+      }
+      return isKitchen;
+    });
+    
+    console.log('[KitchenStaff] Filtered kitchen staff:', filtered.length);
+    return filtered;
   }, [employees])
 
   // Get all kitchen staff assignments for a date (across all shift types)

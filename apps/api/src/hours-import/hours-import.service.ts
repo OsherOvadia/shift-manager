@@ -566,6 +566,12 @@ export class HoursImportService {
             continue;
           }
 
+          // CRITICAL: Only create assignment if we have valid times
+          if (!shift.startTime || !shift.endTime) {
+            console.log(`[ShiftCreate] ⚠️ WARNING: ${worker.name} on ${shiftDate.toISOString().split('T')[0]} has NO times (start:${shift.startTime}, end:${shift.endTime}) - SKIPPING`);
+            continue;
+          }
+
           const assignmentData = {
             scheduleId: schedule.id,
             userId: worker.matchedUserId!,
@@ -577,14 +583,17 @@ export class HoursImportService {
             status: 'CONFIRMED' as any,
           };
 
-          console.log(`[ShiftCreate] Creating: ${worker.name} on ${shiftDate.toISOString().split('T')[0]} - ${shift.startTime}-${shift.endTime} (${shift.totalHours}h) - Template: ${template.shiftType}`);
+          console.log(`[ShiftCreate] ➡️ Creating: ${worker.name} on ${shiftDate.toISOString().split('T')[0]}`);
+          console.log(`[ShiftCreate]    Times: ${shift.startTime} → ${shift.endTime} (${shift.totalHours}h)`);
+          console.log(`[ShiftCreate]    Template: ${template.shiftType} (${template.startTime}-${template.endTime})`);
 
           try {
-            await this.prisma.shiftAssignment.create({
+            const created = await this.prisma.shiftAssignment.create({
               data: assignmentData,
             });
             assignmentsCreated++;
-            console.log(`[ShiftCreate] ✅ Created assignment ${assignmentsCreated}`);
+            console.log(`[ShiftCreate] ✅ Assignment #${assignmentsCreated} created (ID: ${created.id})`);
+            console.log(`[ShiftCreate]    DB Values: start=${created.actualStartTime}, end=${created.actualEndTime}, hours=${created.actualHours}`);
           } catch (err: any) {
             // May fail on unique constraint if data is weird - log and continue
             console.error(`[ShiftCreate] ❌ FAILED for ${worker.name} on ${shiftDate.toISOString()}: ${err.message}`);
@@ -1178,11 +1187,14 @@ export class HoursImportService {
     const numberValues: number[] = [];
     const durationValues: number[] = []; // For H:MM format hours (like 5:58 = 5.97h)
 
-    console.log(`[TimeExtract] Day ${day}, Raw cells:`, row.map((c, i) => `[${i}]="${c}"`).join(', '));
+    console.log(`[TimeExtract] Day ${day}, Raw cells:`, row.map((c, i) => `[${i}]="${c}" (type: ${typeof c})`).join(', '));
 
-    for (const cell of row) {
+    for (let i = 0; i < row.length; i++) {
+      const cell = row[i];
       const trimmed = String(cell).trim();
       if (!trimmed || trimmed === '0') continue;
+
+      console.log(`[TimeExtract] Cell[${i}]: "${trimmed}" (original type: ${typeof cell})`);
 
       // Check for Excel serial number (times stored as decimal fractions of a day)
       // Example: 0.479166667 = 11:30, 0.708333333 = 17:00
@@ -1192,57 +1204,77 @@ export class HoursImportService {
         const totalMinutes = Math.round(num * 24 * 60);
         const h = Math.floor(totalMinutes / 60);
         const m = totalMinutes % 60;
-        if (h >= 6 && h <= 23) {
-          const timeStr = `${h}:${m.toString().padStart(2, '0')}`;
-          timeValues.push(timeStr);
-          console.log(`[TimeExtract] Converted Excel serial ${num} → ${timeStr}`);
-          continue;
-        }
+        const timeStr = `${h}:${m.toString().padStart(2, '0')}`;
+        timeValues.push(timeStr);
+        console.log(`[TimeExtract] ✅ Converted Excel serial ${num} → ${timeStr}`);
+        continue;
       }
 
-      // Check for time pattern HH:MM or H:MM
+      // Check for time pattern HH:MM or H:MM (most common format)
       if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
         const [h, m] = trimmed.split(':').map(Number);
         if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
           const hoursValue = h + m / 60;
-          // Classify: clock times (entry/exit) are typically >= 6:00 and <= 23:59
-          // Duration hours (total worked) are typically < 15 hours
-          if (h >= 6 && h <= 23) {
-            timeValues.push(trimmed); // Likely a clock time (entry/exit)
-            console.log(`[TimeExtract] Found clock time: ${trimmed}`);
-          }
+          
+          // Always capture time values for potential entry/exit
+          timeValues.push(trimmed);
+          console.log(`[TimeExtract] ✅ Found time: ${trimmed} (${hoursValue.toFixed(2)}h)`);
+          
           // If it looks like duration (under 15 hours), also track as duration
           if (hoursValue > 0 && hoursValue < 15) {
             durationValues.push(hoursValue);
-            console.log(`[TimeExtract] Found duration: ${trimmed} (${hoursValue.toFixed(2)}h)`);
+            console.log(`[TimeExtract] Also treating as duration`);
           }
         }
       }
 
-      // Check for decimal hours (like 5.36, 6.26)
-      if (!isNaN(num) && num > 0 && num < 24 && trimmed.includes('.')) {
+      // Check for decimal hours (like 5.36, 6.26 for total hours worked)
+      if (!isNaN(num) && num >= 1 && num < 24 && trimmed.includes('.')) {
         numberValues.push(num);
-        console.log(`[TimeExtract] Found decimal hours: ${num}`);
+        console.log(`[TimeExtract] ✅ Found decimal hours: ${num}`);
       }
     }
 
+    console.log(`[TimeExtract] ===== SUMMARY =====`);
     console.log(`[TimeExtract] All times found:`, timeValues);
     console.log(`[TimeExtract] All decimal hours:`, numberValues);
     console.log(`[TimeExtract] All durations:`, durationValues);
 
-    // Separate clock times from duration values
-    // Clock times: typically >= 6:00 (entry around 8-18, exit around 15-00)
-    // Sort time values by hour to identify entry (earlier) and exit (later)
+    // Filter out duration times from clock times
+    // Remove any time value that's under 12 hours (likely a duration, not a clock time)
+    const clockTimes = timeValues.filter(t => {
+      const [h] = t.split(':').map(Number);
+      return h >= 6; // Clock times are typically 6:00 or later
+    });
+
+    console.log(`[TimeExtract] Filtered clock times:`, clockTimes);
+
     // In RTL Excel: last time column = entry (כניסה), second to last = exit (יציאה)
-    if (timeValues.length >= 2) {
-      startTime = timeValues[timeValues.length - 1]; // Last = entry (כניסה)
-      endTime = timeValues[timeValues.length - 2];   // Second to last = exit (יציאה)
-      console.log(`[TimeExtract] Assigned times: ${startTime} → ${endTime}`);
-    } else if (timeValues.length === 1) {
-      startTime = timeValues[0];
-      console.log(`[TimeExtract] Only one time found: ${startTime}`);
+    // Or: first time = entry, second time = exit (chronological order)
+    if (clockTimes.length >= 2) {
+      // Try to determine which is entry and which is exit
+      // Usually entry < exit, but not always due to column order
+      startTime = clockTimes[clockTimes.length - 1]; // Last = entry (כניסה) in RTL
+      endTime = clockTimes[clockTimes.length - 2];   // Second to last = exit (יציאה)
+      
+      // Validate: if startTime > endTime, they might be in wrong order
+      const [sh] = startTime.split(':').map(Number);
+      const [eh] = endTime.split(':').map(Number);
+      if (sh > eh && eh < 6) {
+        // Exit is past midnight (like 01:00), keep as is
+        console.log(`[TimeExtract] Overnight shift detected`);
+      } else if (sh > eh) {
+        // Likely wrong order, swap them
+        [startTime, endTime] = [endTime, startTime];
+        console.log(`[TimeExtract] Swapped order (was backwards)`);
+      }
+      
+      console.log(`[TimeExtract] ✅ Assigned times: ${startTime} → ${endTime}`);
+    } else if (clockTimes.length === 1) {
+      startTime = clockTimes[0];
+      console.log(`[TimeExtract] ⚠️ Only one time found: ${startTime}`);
     } else {
-      console.log(`[TimeExtract] ⚠️ No times found!`);
+      console.log(`[TimeExtract] ❌ No clock times found! All values:`, timeValues);
     }
 
     // Total hours - prefer decimal values (like 5.96), then duration H:MM values
