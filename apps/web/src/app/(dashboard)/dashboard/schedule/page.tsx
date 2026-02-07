@@ -77,22 +77,59 @@ export default function SchedulePage() {
 
   const kitchenStaff = useMemo(() => {
     if (!employees) return []
-    return employees.filter((emp: any) => {
+    
+    console.log('[KitchenFilter] Total employees:', employees.length)
+    
+    const filtered = employees.filter((emp: any) => {
       const categoryName = emp.jobCategory?.name?.toLowerCase() || ''
       const categoryNameHe = emp.jobCategory?.nameHe?.toLowerCase() || ''
-      return kitchenCategories.some(kitchen =>
+      
+      console.log(`[KitchenFilter] ${emp.firstName} ${emp.lastName}:`, {
+        categoryName,
+        categoryNameHe,
+        jobCategory: emp.jobCategory,
+      })
+      
+      const isKitchen = kitchenCategories.some(kitchen =>
         categoryName.includes(kitchen) || categoryNameHe.includes(kitchen)
       )
+      
+      if (isKitchen) {
+        console.log(`[KitchenFilter] ✅ ${emp.firstName} identified as kitchen staff`)
+      }
+      
+      return isKitchen
     })
+    
+    console.log('[KitchenFilter] Found kitchen staff:', filtered.length, filtered.map((k: any) => k.firstName))
+    return filtered
   }, [employees])
 
   const getKitchenWorkerAssignment = (userId: string, date: Date) => {
-    if (!scheduleDetails?.shiftAssignments) return null
+    if (!scheduleDetails?.shiftAssignments) {
+      console.log('[KitchenAssignment] No shift assignments in scheduleDetails')
+      return null
+    }
+    
     const dateStr = date.toISOString().split('T')[0]
-    return scheduleDetails.shiftAssignments.find((a: any) => {
+    const userAssignments = scheduleDetails.shiftAssignments.filter((a: any) => a.userId === userId)
+    
+    console.log(`[KitchenAssignment] Looking for user ${userId} on ${dateStr}, found ${userAssignments.length} total assignments for user`)
+    
+    const assignment = scheduleDetails.shiftAssignments.find((a: any) => {
       const assignmentDate = new Date(a.shiftDate).toISOString().split('T')[0]
       return assignmentDate === dateStr && a.userId === userId
-    }) || null
+    })
+    
+    if (assignment) {
+      console.log(`[KitchenAssignment] ✅ Found assignment for ${dateStr}:`, {
+        worker: `${assignment.user.firstName} ${assignment.user.lastName}`,
+        start: assignment.actualStartTime || assignment.shiftTemplate?.startTime,
+        end: assignment.actualEndTime || assignment.shiftTemplate?.endTime,
+      })
+    }
+    
+    return assignment || null
   }
 
   const calculateHoursFromTimes = (start: string, end: string): number => {
