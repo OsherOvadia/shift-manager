@@ -1176,13 +1176,24 @@ export class HoursImportService {
     return workers;
   }
 
+  /**
+   * Convert Excel serial time number to HH:MM format.
+   * Excel stores times as fractions of a day (0.5 = 12:00, 0.75 = 18:00)
+   */
+  private excelSerialToTime(serial: number): string {
+    const totalMinutes = Math.round(serial * 24 * 60);
+    const h = Math.floor(totalMinutes / 60) % 24;
+    const m = totalMinutes % 60;
+    return `${h}:${m.toString().padStart(2, '0')}`;
+  }
+
   private extractShiftFromRow(row: string[], day: string): ParsedShift | null {
     // CSV Column Structure (from raw_data.csv):
     // תאריך,כניסה,יציאה,סה'כ,100%,125%,150%,שבת,הפסקה,יום,שם,עובד
     // Col:  0     1      2      3   4    5     6    7     8       9    10   11
     // 
-    // Column 1 = כניסה (entry time) - e.g., "17:49", "11:57"
-    // Column 2 = יציאה (exit time) - e.g., "23:29", "0:22" (past midnight!)
+    // Column 1 = כניסה (entry time) - Excel serial OR "HH:MM"
+    // Column 2 = יציאה (exit time) - Excel serial OR "HH:MM" (past midnight!)
     // Column 6 = 150% total hours (decimal like 5.66)
     
     let totalHours = 0;
@@ -1194,25 +1205,41 @@ export class HoursImportService {
     console.log(`[TimeExtract] Row[2] (Exit): "${row[2]}"`);
     console.log(`[TimeExtract] Row[6] (Hours): "${row[6]}"`);
 
-    // DIRECT COLUMN PARSING - Column 1 = Entry, Column 2 = Exit
+    // PARSE ENTRY TIME (Column 1)
     const entryCell = row[1]?.toString().trim();
-    const exitCell = row[2]?.toString().trim();
-    
-    // Parse entry time (accept all valid HH:MM format)
-    if (entryCell && /^\d{1,2}:\d{2}$/.test(entryCell)) {
-      const [h, m] = entryCell.split(':').map(Number);
-      if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
-        startTime = entryCell;
-        console.log(`[TimeExtract] ✅ Entry time: ${startTime}`);
+    if (entryCell) {
+      // Check if it's an Excel serial number (0.xxx)
+      const entryNum = parseFloat(entryCell);
+      if (!isNaN(entryNum) && entryNum >= 0 && entryNum < 1 && !entryCell.includes(':')) {
+        startTime = this.excelSerialToTime(entryNum);
+        console.log(`[TimeExtract] ✅ Entry (Excel serial ${entryNum}): ${startTime}`);
+      }
+      // Check if it's already HH:MM format
+      else if (/^\d{1,2}:\d{2}$/.test(entryCell)) {
+        const [h, m] = entryCell.split(':').map(Number);
+        if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+          startTime = entryCell;
+          console.log(`[TimeExtract] ✅ Entry (HH:MM): ${startTime}`);
+        }
       }
     }
     
-    // Parse exit time - CRITICAL: Accept 0:00-5:59 for past midnight exits!
-    if (exitCell && /^\d{1,2}:\d{2}$/.test(exitCell)) {
-      const [h, m] = exitCell.split(':').map(Number);
-      if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
-        endTime = exitCell;
-        console.log(`[TimeExtract] ✅ Exit time: ${endTime}`);
+    // PARSE EXIT TIME (Column 2) - Accept past-midnight times!
+    const exitCell = row[2]?.toString().trim();
+    if (exitCell) {
+      // Check if it's an Excel serial number (0.xxx)
+      const exitNum = parseFloat(exitCell);
+      if (!isNaN(exitNum) && exitNum >= 0 && exitNum < 1 && !exitCell.includes(':')) {
+        endTime = this.excelSerialToTime(exitNum);
+        console.log(`[TimeExtract] ✅ Exit (Excel serial ${exitNum}): ${endTime}`);
+      }
+      // Check if it's already HH:MM format
+      else if (/^\d{1,2}:\d{2}$/.test(exitCell)) {
+        const [h, m] = exitCell.split(':').map(Number);
+        if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+          endTime = exitCell;
+          console.log(`[TimeExtract] ✅ Exit (HH:MM): ${endTime}`);
+        }
       }
     }
 
