@@ -67,16 +67,27 @@ const HEBREW_DAY_MAP: { [key: string]: number } = {
 
 // Known department values mapped to job category names
 const DEPARTMENT_TO_CATEGORY: { [key: string]: { category: string; isTipBased: boolean } } = {
+  // Waiters and front-of-house staff
   'מלצר': { category: 'waiter', isTipBased: true },
   'מלצרית': { category: 'waiter', isTipBased: true },
   'אחמשית': { category: 'waiter', isTipBased: true },
   'אח"מ': { category: 'waiter', isTipBased: true },
   'אחראי משמרת': { category: 'waiter', isTipBased: true },
   'אחראי': { category: 'waiter', isTipBased: true },
+  'מנהל': { category: 'waiter', isTipBased: true },
+  'מנהלת': { category: 'waiter', isTipBased: true },
+  'משמרת': { category: 'waiter', isTipBased: true },
+  
+  // Kitchen staff - cooks
   'טבח': { category: 'cook', isTipBased: false },
   'טבחית': { category: 'cook', isTipBased: false },
+  'שף': { category: 'cook', isTipBased: false },
+  
+  // Kitchen staff - sushi
   'סושימן': { category: 'sushi', isTipBased: false },
   'סושי': { category: 'sushi', isTipBased: false },
+  
+  // Kitchen staff - dishwashers
   'שוטף': { category: 'dishwasher', isTipBased: false },
   'שוטף כלים': { category: 'dishwasher', isTipBased: false },
 };
@@ -393,7 +404,13 @@ export class HoursImportService {
         }
       }
     } else {
-      console.log(`[CreateWorker] ⚠️ No category provided for ${name}`);
+      // FALLBACK: Workers without department default to 'waiter'
+      console.log(`[CreateWorker] ⚠️ No category provided for ${name} - defaulting to waiter`);
+      if (categoryMap.has('waiter')) {
+        jobCategoryId = categoryMap.get('waiter')!;
+        isTipBased = true;
+        console.log(`[CreateWorker] ✅ Assigned default category: waiter (${jobCategoryId})`);
+      }
     }
 
     // Determine the wage: use per-category wage if available, otherwise the general default
@@ -407,7 +424,13 @@ export class HoursImportService {
         console.log(`[CreateWorker] Using default wage: ${wage}`);
       }
     } else {
-      console.log(`[CreateWorker] Using default wage: ${wage} (no category)`);
+      // If no category but we defaulted to waiter, use waiter wage
+      if (jobCategoryId && defaultWages['waiter'] !== undefined) {
+        wage = defaultWages['waiter'];
+        console.log(`[CreateWorker] Using waiter wage: ${wage} (defaulted to waiter)`);
+      } else {
+        console.log(`[CreateWorker] Using default wage: ${wage} (no category)`);
+      }
     }
 
     const userData: any = {

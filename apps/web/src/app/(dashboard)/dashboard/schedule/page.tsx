@@ -49,7 +49,12 @@ export default function SchedulePage() {
 
   const { data: schedules, isLoading: schedulesLoading } = useQuery({
     queryKey: ['schedules'],
-    queryFn: () => api.get<any[]>('/schedules', accessToken!),
+    queryFn: async () => {
+      const data = await api.get<any[]>('/schedules', accessToken!)
+      console.log('[Schedules] All schedules loaded:', data?.length, 'schedules')
+      console.log('[Schedules] Week dates:', data?.map((s: any) => s.weekStartDate))
+      return data
+    },
     enabled: !!accessToken,
   })
 
@@ -59,9 +64,25 @@ export default function SchedulePage() {
     return scheduleDate.getTime() === targetWeekStart.getTime()
   })
 
+  console.log('[CurrentSchedule] Selected schedule for week:', targetWeekStart.toISOString(), currentSchedule ? `Found (ID: ${currentSchedule.id})` : 'NOT FOUND')
+
   const { data: scheduleDetails, isLoading: detailsLoading } = useQuery({
     queryKey: ['schedule', currentSchedule?.id],
-    queryFn: () => api.get<any>(`/schedules/${currentSchedule.id}`, accessToken!),
+    queryFn: async () => {
+      const data = await api.get<any>(`/schedules/${currentSchedule.id}`, accessToken!)
+      console.log('[ScheduleDetails] API Response:', {
+        scheduleId: currentSchedule?.id,
+        weekStart: currentSchedule?.weekStartDate,
+        totalAssignments: data?.shiftAssignments?.length || 0,
+        hasData: !!data,
+        sampleAssignments: data?.shiftAssignments?.slice(0, 3).map((a: any) => ({
+          user: `${a.user.firstName} ${a.user.lastName}`,
+          date: a.shiftDate,
+          category: a.user.jobCategory?.name,
+        })),
+      })
+      return data
+    },
     enabled: !!currentSchedule?.id && !!accessToken,
   })
 
