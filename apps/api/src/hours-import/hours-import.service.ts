@@ -534,7 +534,7 @@ export class HoursImportService {
           const schedule = scheduleMap.get(weekSunday.toISOString());
           if (!schedule) continue;
 
-          const template = this.findBestTemplate(templates, shift.startTime);
+          const template = this.findBestTemplate(templates, shift.startTime, shift.endTime);
           if (!template) continue;
 
           try {
@@ -684,25 +684,40 @@ export class HoursImportService {
   }
 
   /**
-   * Find the best matching shift template based on start time.
-   * If start time is before 15:00, use MORNING template; otherwise EVENING.
-   * If no match by time, use first available template.
+   * Find the best matching shift template based on the midpoint of the shift.
+   * Uses the middle of the worker's actual shift to decide morning vs evening.
+   * Example: 11:00-19:00 midpoint=15:00 → morning (majority of shift is daytime)
+   * Example: 17:00-22:00 midpoint=19:30 → evening
    */
-  private findBestTemplate(templates: any[], startTime: string | null): any {
+  private findBestTemplate(templates: any[], startTime: string | null, endTime?: string | null): any {
     if (!startTime) {
       // No time info - return first template
       return templates[0] || null;
     }
 
-    const [hours] = startTime.split(':').map(Number);
+    const [startH, startM] = startTime.split(':').map(Number);
+    const startMins = startH * 60 + (startM || 0);
 
-    // Determine shift type based on start hour
-    if (hours < 15) {
-      // Morning shift
+    // Calculate the midpoint of the shift to determine the "main" shift type
+    let midpointMins = startMins; // Default to start time if no end time
+    if (endTime) {
+      const [endH, endM] = endTime.split(':').map(Number);
+      let endMins = endH * 60 + (endM || 0);
+      // Handle overnight shifts (end time < start time)
+      if (endMins < startMins) endMins += 24 * 60;
+      midpointMins = Math.round((startMins + endMins) / 2);
+      // Wrap around midnight
+      if (midpointMins >= 24 * 60) midpointMins -= 24 * 60;
+    }
+
+    const midpointHours = midpointMins / 60;
+
+    // If the midpoint of the shift is before 16:00 → morning shift
+    // If the midpoint is 16:00 or later → evening shift
+    if (midpointHours < 16) {
       const morning = templates.find(t => t.shiftType === 'MORNING');
       if (morning) return morning;
     } else {
-      // Evening shift
       const evening = templates.find(t => t.shiftType === 'EVENING' || t.shiftType === 'EVENING_CLOSE');
       if (evening) return evening;
     }

@@ -419,6 +419,46 @@ export default function ManageSchedulePage() {
     })
   }
 
+  // Get kitchen staff (cooks, sushi, dishwashers)
+  const kitchenCategories = ['cook', 'טבח', 'chef', 'sushiman', 'סושימן', 'sushi', 'kitchen', 'מטבח']
+  
+  const kitchenStaff = useMemo(() => {
+    if (!employees) return []
+    return employees.filter(emp => {
+      const categoryName = emp.jobCategory?.name?.toLowerCase() || ''
+      const categoryNameHe = emp.jobCategory?.nameHe?.toLowerCase() || ''
+      return kitchenCategories.some(kitchen =>
+        categoryName.includes(kitchen) || categoryNameHe.includes(kitchen)
+      )
+    })
+  }, [employees])
+
+  // Get all kitchen staff assignments for a date (across all shift types)
+  const getKitchenAssignmentsForDate = (date: Date) => {
+    if (!scheduleDetails?.shiftAssignments) return []
+    const dateStr = formatDateLocal(date)
+    return scheduleDetails.shiftAssignments.filter((a: any) => {
+      const assignmentDate = a.shiftDate.split('T')[0]
+      if (assignmentDate !== dateStr) return false
+      // Check if this worker is kitchen staff
+      const categoryName = a.user?.jobCategory?.name?.toLowerCase() || ''
+      const categoryNameHe = a.user?.jobCategory?.nameHe?.toLowerCase() || ''
+      return kitchenCategories.some(kitchen =>
+        categoryName.includes(kitchen) || categoryNameHe.includes(kitchen)
+      )
+    })
+  }
+
+  // Get assignment for a specific kitchen worker on a specific date
+  const getKitchenWorkerAssignment = (userId: string, date: Date) => {
+    if (!scheduleDetails?.shiftAssignments) return null
+    const dateStr = formatDateLocal(date)
+    return scheduleDetails.shiftAssignments.find((a: any) => {
+      const assignmentDate = a.shiftDate.split('T')[0]
+      return assignmentDate === dateStr && a.userId === userId
+    }) || null
+  }
+
   // Check if an employee submitted availability for a specific shift (optimized)
   const hasAvailability = (userId: string, date: Date, shiftType: string) => {
     const dateStr = formatDateLocal(date)
@@ -527,6 +567,7 @@ export default function ManageSchedulePage() {
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       ) : currentSchedule ? (
+        <>
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -654,6 +695,115 @@ export default function ManageSchedulePage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Kitchen Staff Table (Cooks & Sushi) */}
+        {kitchenStaff.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                🍳 טבחים וסושימנים
+              </CardTitle>
+              <CardDescription>
+                שעות עבודה של צוות מטבח לשבוע זה
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="p-3 text-right font-medium min-w-[120px]">עובד</th>
+                      {weekDates.map((date) => (
+                        <th
+                          key={date.toISOString()}
+                          className={cn(
+                            'p-3 text-center font-medium min-w-[100px]',
+                            isWeekend(date, weekendDays) && 'bg-orange-50 dark:bg-orange-950'
+                          )}
+                        >
+                          <div className="text-sm">{getDayLetter(date)}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatShortDate(date)}
+                          </div>
+                        </th>
+                      ))}
+                      <th className="p-3 text-center font-medium min-w-[80px]">סה״כ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {kitchenStaff.map((worker) => {
+                      let weekTotalHours = 0
+                      return (
+                        <tr key={worker.id} className="border-b hover:bg-muted/50">
+                          <td className="p-3">
+                            <div className="font-medium text-sm">
+                              {worker.firstName} {worker.lastName?.[0] || ''}.
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {worker.jobCategory?.nameHe || worker.jobCategory?.name || 'מטבח'}
+                            </div>
+                          </td>
+                          {weekDates.map((date) => {
+                            const assignment = getKitchenWorkerAssignment(worker.id, date)
+                            if (assignment) {
+                              const scheduledStart = assignment.shiftTemplate?.startTime || ''
+                              const scheduledEnd = assignment.shiftTemplate?.endTime || ''
+                              const displayStart = assignment.actualStartTime || scheduledStart
+                              const displayEnd = assignment.actualEndTime || scheduledEnd
+                              const hours = assignment.actualHours || calculateHoursFromTimes(displayStart, displayEnd)
+                              weekTotalHours += hours || 0
+                              return (
+                                <td
+                                  key={date.toISOString()}
+                                  className={cn(
+                                    'p-2 text-center align-middle',
+                                    isWeekend(date, weekendDays) && 'bg-orange-50 dark:bg-orange-950'
+                                  )}
+                                >
+                                  <div
+                                    className="text-xs p-1.5 bg-orange-100 dark:bg-orange-900/40 rounded cursor-pointer hover:bg-orange-200 dark:hover:bg-orange-900/60 transition-colors"
+                                    onClick={() => openEditTimesDialog(assignment)}
+                                    title="לחץ לעריכת זמנים"
+                                  >
+                                    <div className="font-medium text-orange-800 dark:text-orange-200">
+                                      {displayStart && displayEnd ? `${displayStart}-${displayEnd}` : '—'}
+                                    </div>
+                                    {hours > 0 && (
+                                      <div className="text-orange-600 dark:text-orange-300 mt-0.5">
+                                        {hours.toFixed(1)}ש׳
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              )
+                            }
+                            return (
+                              <td
+                                key={date.toISOString()}
+                                className={cn(
+                                  'p-2 text-center align-middle text-muted-foreground text-xs',
+                                  isWeekend(date, weekendDays) && 'bg-orange-50 dark:bg-orange-950'
+                                )}
+                              >
+                                —
+                              </td>
+                            )
+                          })}
+                          <td className="p-3 text-center">
+                            <div className="font-bold text-sm">
+                              {weekTotalHours.toFixed(1)}ש׳
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        </>
       ) : null}
 
       {/* Worker Selection Dialog */}
