@@ -651,24 +651,25 @@ export default function ManageSchedulePage() {
                                           </Button>
                                         </div>
                                       </div>
-                                      {hasActualTimes && (
-                                        <div className="text-xs text-muted-foreground mt-1">
-                                          <span className={cn(
-                                            a.actualStartTime && a.actualStartTime !== scheduledStart && 'text-amber-600'
-                                          )}>
-                                            {displayStart}
-                                          </span>
-                                          {' - '}
-                                          <span className={cn(
-                                            a.actualEndTime && a.actualEndTime !== scheduledEnd && 'text-amber-600'
-                                          )}>
-                                            {displayEnd}
-                                          </span>
+                                      {/* Always show times - either actual or scheduled */}
+                                      <div className="text-xs text-muted-foreground mt-1">
+                                        <span className={cn(
+                                          hasActualTimes && a.actualStartTime && a.actualStartTime !== scheduledStart && 'text-amber-600 font-semibold'
+                                        )}>
+                                          {displayStart}
+                                        </span>
+                                        {' - '}
+                                        <span className={cn(
+                                          hasActualTimes && a.actualEndTime && a.actualEndTime !== scheduledEnd && 'text-amber-600 font-semibold'
+                                        )}>
+                                          {displayEnd}
+                                        </span>
+                                        {displayHours > 0 && (
                                           <span className="mr-1">
-                                            ({displayHours}ש)
+                                            ({displayHours.toFixed(1)}ש)
                                           </span>
-                                        </div>
-                                      )}
+                                        )}
+                                      </div>
                                     </div>
                                   )
                                 })}

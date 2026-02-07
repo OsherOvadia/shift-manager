@@ -254,19 +254,35 @@ export default function SchedulePage() {
                           >
                             {assignments.length > 0 ? (
                               <div className="space-y-1">
-                                {assignments.map((a: any) => (
-                                  <div
-                                    key={a.id}
-                                    className={cn(
-                                      'text-sm p-1 rounded',
-                                      a.userId === user?.id
-                                        ? 'bg-primary text-primary-foreground font-medium'
-                                        : 'bg-muted'
-                                    )}
-                                  >
-                                    {a.user.firstName} {a.user.lastName[0]}.
-                                  </div>
-                                ))}
+                                {assignments.map((a: any) => {
+                                  const scheduledStart = a.shiftTemplate?.startTime || ''
+                                  const scheduledEnd = a.shiftTemplate?.endTime || ''
+                                  const displayStart = a.actualStartTime || scheduledStart
+                                  const displayEnd = a.actualEndTime || scheduledEnd
+                                  const displayHours = a.actualHours || calculateHoursFromTimes(displayStart, displayEnd)
+                                  
+                                  return (
+                                    <div
+                                      key={a.id}
+                                      className={cn(
+                                        'text-sm p-2 rounded',
+                                        a.userId === user?.id
+                                          ? 'bg-primary text-primary-foreground font-medium'
+                                          : 'bg-muted'
+                                      )}
+                                    >
+                                      <div className="font-medium">
+                                        {a.user.firstName} {a.user.lastName[0]}.
+                                      </div>
+                                      {(displayStart || displayEnd) && (
+                                        <div className="text-xs opacity-90 mt-0.5">
+                                          {displayStart}-{displayEnd}
+                                          {displayHours > 0 && ` (${displayHours.toFixed(1)}ש)`}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })}
                               </div>
                             ) : (
                               <span className="text-muted-foreground text-sm">-</span>

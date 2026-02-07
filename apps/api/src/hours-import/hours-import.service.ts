@@ -488,14 +488,23 @@ export class HoursImportService {
     console.log(`[ShiftCreate] Week start dates: ${weekStartDates.map(d => d.toISOString()).join(', ')}`);
     console.log(`[ShiftCreate] Templates: ${templates.map(t => `${t.shiftType}(${(t as any).startTime})`).join(', ')}`);
     console.log(`[ShiftCreate] Schedules created/found: ${scheduleMap.size}`);
+    console.log(`[ShiftCreate] Schedule IDs: ${Array.from(scheduleMap.values()).map((s: any) => s.id).join(', ')}`);
 
     // Build a map of day letter occurrences for each worker
     // For monthly data, shifts with the same day letter are in chronological order
     // First א = first Sunday of month, second א = second Sunday, etc.
     let assignmentsCreated = 0;
 
+    console.log(`[ShiftCreate] Starting to create assignments for ${workers.length} workers...`);
     for (const worker of workers) {
-      if (!worker.matchedUserId) continue;
+      if (!worker.matchedUserId) {
+        console.log(`[ShiftCreate] ⚠️ Skipping ${worker.name} - no matched user ID`);
+        continue;
+      }
+      console.log(`[ShiftCreate] Processing ${worker.name} (${worker.shifts.length} shifts)`);
+      if (worker.shifts.length === 0) {
+        console.log(`[ShiftCreate] ⚠️ ${worker.name} has NO shifts in Excel data`);
+      }
 
       // Group shifts by day letter, preserving order
       const dayOccurrences = new Map<string, ParsedShift[]>();
@@ -535,25 +544,33 @@ export class HoursImportService {
           if (!schedule) continue;
 
           const template = this.findBestTemplate(templates, shift.startTime, shift.endTime);
-          if (!template) continue;
+          if (!template) {
+            console.log(`[ShiftCreate] ❌ No template for ${worker.name} shift ${shift.startTime}-${shift.endTime}`);
+            continue;
+          }
+
+          const assignmentData = {
+            scheduleId: schedule.id,
+            userId: worker.matchedUserId!,
+            shiftTemplateId: template.id,
+            shiftDate,
+            actualStartTime: shift.startTime,
+            actualEndTime: shift.endTime,
+            actualHours: shift.totalHours,
+            status: 'CONFIRMED' as any,
+          };
+
+          console.log(`[ShiftCreate] Creating: ${worker.name} on ${shiftDate.toISOString().split('T')[0]} - ${shift.startTime}-${shift.endTime} (${shift.totalHours}h) - Template: ${template.shiftType}`);
 
           try {
             await this.prisma.shiftAssignment.create({
-              data: {
-                scheduleId: schedule.id,
-                userId: worker.matchedUserId!,
-                shiftTemplateId: template.id,
-                shiftDate,
-                actualStartTime: shift.startTime,
-                actualEndTime: shift.endTime,
-                actualHours: shift.totalHours,
-                status: 'CONFIRMED' as any,
-              },
+              data: assignmentData,
             });
             assignmentsCreated++;
+            console.log(`[ShiftCreate] ✅ Created assignment ${assignmentsCreated}`);
           } catch (err: any) {
             // May fail on unique constraint if data is weird - log and continue
-            console.error(`[ShiftCreate] FAILED for ${worker.name} on ${shiftDate.toISOString()}: ${err.message}`);
+            console.error(`[ShiftCreate] ❌ FAILED for ${worker.name} on ${shiftDate.toISOString()}: ${err.message}`);
           }
         }
       }
@@ -561,6 +578,9 @@ export class HoursImportService {
 
     // Auto-populate CookWeeklyHours for cook/sushi workers
     await this.populateCookWeeklyHours(workers, organizationId, weekStartDates, monthStart, monthEnd);
+
+    console.log(`[ShiftCreate] ✅ COMPLETED: Created ${assignmentsCreated} shift assignments for month ${monthYearStr}`);
+    console.log(`[ShiftCreate] Schedules updated: ${Array.from(scheduleMap.values()).map((s: any) => `Week ${new Date(s.weekStartDate).toISOString().split('T')[0]}`).join(', ')}`);
 
     return assignmentsCreated;
   }
