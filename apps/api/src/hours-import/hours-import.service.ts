@@ -437,17 +437,12 @@ export class HoursImportService {
     });
     if (templates.length === 0) return 0;
 
-    // Delete existing shift assignments for these workers in this month (overwrite)
-    const userIds = workers
-      .filter(w => w.matchedUserId)
-      .map(w => w.matchedUserId as string);
-
-    if (userIds.length > 0) {
-      const scheduleIds = Array.from(scheduleMap.values()).map((s: any) => s.id);
+    // Delete ALL existing shift assignments in this org for the entire month (full override)
+    const scheduleIds = Array.from(scheduleMap.values()).map((s: any) => s.id);
+    if (scheduleIds.length > 0) {
       await this.prisma.shiftAssignment.deleteMany({
         where: {
           scheduleId: { in: scheduleIds },
-          userId: { in: userIds },
           shiftDate: {
             gte: monthStart,
             lte: monthEnd,
@@ -455,6 +450,16 @@ export class HoursImportService {
         },
       });
     }
+
+    // Also clear existing CookWeeklyHours for this month (will be re-populated from import)
+    await this.prisma.cookWeeklyHours.deleteMany({
+      where: {
+        organizationId,
+        weekStart: {
+          in: weekStartDates,
+        },
+      },
+    });
 
     // Build a map of day letter occurrences for each worker
     // For monthly data, shifts with the same day letter are in chronological order
@@ -526,7 +531,128 @@ export class HoursImportService {
       }
     }
 
+    // Auto-populate CookWeeklyHours for cook/sushi workers
+    await this.populateCookWeeklyHours(workers, organizationId, weekStartDates, monthStart, monthEnd);
+
     return assignmentsCreated;
+  }
+
+  /**
+   * Auto-populate CookWeeklyHours from imported shift data.
+   * For each cook worker, group their shifts by week and create CookWeeklyHours entries.
+   */
+  private async populateCookWeeklyHours(
+    workers: MatchedWorker[],
+    organizationId: string,
+    weekStartDates: Date[],
+    monthStart: Date,
+    monthEnd: Date,
+  ): Promise<void> {
+    // Get all cook/sushi job category names
+    const cookCategoryNames = ['cook', 'טבח', 'sushi', 'סושימן', 'sushiman'];
+
+    for (const worker of workers) {
+      if (!worker.matchedUserId) continue;
+      if (worker.shifts.length === 0) continue;
+
+      // Check if this worker is a cook/sushi (by category from Excel or by DB job category)
+      const categoryMapping = DEPARTMENT_TO_CATEGORY[(worker.category || '').trim()];
+      const isCook = categoryMapping && (categoryMapping.category === 'cook' || categoryMapping.category === 'sushi');
+
+      // Also check DB user job category
+      let isCookByDb = false;
+      if (!isCook) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: worker.matchedUserId },
+          include: { jobCategory: { select: { name: true } } },
+        });
+        isCookByDb = user?.jobCategory ? cookCategoryNames.includes(user.jobCategory.name) : false;
+      }
+
+      if (!isCook && !isCookByDb) continue;
+
+      // Get the user's hourly wage
+      const user = await this.prisma.user.findUnique({
+        where: { id: worker.matchedUserId },
+        select: { hourlyWage: true },
+      });
+      const hourlyWage = user?.hourlyWage ?? 0;
+
+      // Group shifts by week start date
+      const weekHoursMap = new Map<string, number>(); // weekStartISO -> total hours
+
+      for (const shift of worker.shifts) {
+        const dayOffset = HEBREW_DAY_MAP[shift.day];
+        if (dayOffset === undefined) continue;
+
+        // Find the correct date for this shift occurrence within the month
+        // We need to determine which specific date this shift falls on
+        // by counting occurrences of this day letter
+        const dayLetter = shift.day;
+        const datesForDay: Date[] = [];
+        for (const wsd of weekStartDates) {
+          const date = new Date(wsd);
+          date.setUTCDate(date.getUTCDate() + dayOffset);
+          if (date >= monthStart && date <= monthEnd) {
+            datesForDay.push(date);
+          }
+        }
+
+        // Find the index of this shift for this day letter
+        const shiftsForDay = worker.shifts.filter(s => s.day === dayLetter);
+        const shiftIdx = shiftsForDay.indexOf(shift);
+        if (shiftIdx < 0 || shiftIdx >= datesForDay.length) continue;
+
+        const shiftDate = datesForDay[shiftIdx];
+
+        // Find the week start for this shift date
+        const weekSunday = new Date(shiftDate);
+        while (weekSunday.getUTCDay() !== 0) {
+          weekSunday.setUTCDate(weekSunday.getUTCDate() - 1);
+        }
+        weekSunday.setUTCHours(0, 0, 0, 0);
+        const weekKey = weekSunday.toISOString();
+
+        weekHoursMap.set(weekKey, (weekHoursMap.get(weekKey) || 0) + shift.totalHours);
+      }
+
+      // Create CookWeeklyHours entries for each week
+      for (const [weekStartISO, totalHours] of weekHoursMap) {
+        if (totalHours <= 0) continue;
+
+        const weekStart = new Date(weekStartISO);
+        const totalEarnings = totalHours * hourlyWage;
+
+        try {
+          await this.prisma.cookWeeklyHours.upsert({
+            where: {
+              organizationId_userId_weekStart: {
+                organizationId,
+                userId: worker.matchedUserId!,
+                weekStart,
+              },
+            },
+            update: {
+              totalHours,
+              hourlyWage,
+              totalEarnings,
+              notes: 'יובא מקובץ שעות',
+            },
+            create: {
+              organizationId,
+              userId: worker.matchedUserId!,
+              weekStart,
+              totalHours,
+              hourlyWage,
+              totalEarnings,
+              notes: 'יובא מקובץ שעות',
+            },
+          });
+        } catch (err) {
+          console.error(`Failed to create cook hours for ${worker.name} week ${weekStartISO}:`, err);
+        }
+      }
+    }
   }
 
   /**
