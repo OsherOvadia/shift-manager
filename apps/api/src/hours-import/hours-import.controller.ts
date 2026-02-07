@@ -126,7 +126,7 @@ export class HoursImportController {
       req.user.organizationId,
       body.workerMapping || {},
       body.monthYear,
-      req.user.id,
+      req.user.sub,
     );
   }
 

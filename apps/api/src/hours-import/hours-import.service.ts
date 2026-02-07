@@ -221,6 +221,12 @@ export class HoursImportService {
 
     // Create actual shift assignments if we have a month/year
     let assignmentsCreated = 0;
+    console.log(`[Import] Effective monthYear: ${effectiveMonthYear}, workers to process: ${matchedWorkers.length}`);
+    console.log(`[Import] Workers with matched IDs: ${matchedWorkers.filter(w => w.matchedUserId).length}`);
+    for (const w of matchedWorkers) {
+      console.log(`[Import] Worker: ${w.name}, matched: ${w.matchedUserId || 'NONE'}, shifts: ${w.shifts.length}, days: ${w.shifts.map(s => s.day).join(',')}`);
+    }
+
     if (effectiveMonthYear) {
       assignmentsCreated = await this.createMonthlyShiftAssignments(
         matchedWorkers,
@@ -228,6 +234,9 @@ export class HoursImportService {
         effectiveMonthYear,
         adminUserId,
       );
+      console.log(`[Import] Assignments created: ${assignmentsCreated}`);
+    } else {
+      console.log(`[Import] No monthYear provided - skipping shift assignment creation`);
     }
 
     // Send notifications to managers/admins about newly created users
@@ -430,12 +439,26 @@ export class HoursImportService {
       scheduleMap.set(wsd.toISOString(), schedule);
     }
 
-    // Get shift templates for time matching
-    const templates = await this.prisma.shiftTemplate.findMany({
+    // Get shift templates for time matching - create defaults if none exist
+    let templates = await this.prisma.shiftTemplate.findMany({
       where: { organizationId, isActive: true },
       orderBy: { startTime: 'asc' },
     });
-    if (templates.length === 0) return 0;
+    if (templates.length === 0) {
+      // Auto-create default shift templates so imports can work
+      const defaultTemplates = [
+        { name: 'משמרת בוקר', shiftType: 'MORNING', startTime: '11:00', endTime: '18:00', organizationId },
+        { name: 'משמרת ערב', shiftType: 'EVENING', startTime: '18:00', endTime: '23:00', organizationId },
+      ];
+      for (const dt of defaultTemplates) {
+        await this.prisma.shiftTemplate.create({ data: dt as any });
+      }
+      templates = await this.prisma.shiftTemplate.findMany({
+        where: { organizationId, isActive: true },
+        orderBy: { startTime: 'asc' },
+      });
+      if (templates.length === 0) return 0;
+    }
 
     // Delete ALL existing shift assignments in this org for the entire month (full override)
     const scheduleIds = Array.from(scheduleMap.values()).map((s: any) => s.id);
@@ -460,6 +483,11 @@ export class HoursImportService {
         },
       },
     });
+
+    console.log(`[ShiftCreate] Month: ${monthYearStr}, monthStart: ${monthStart.toISOString()}, monthEnd: ${monthEnd.toISOString()}`);
+    console.log(`[ShiftCreate] Week start dates: ${weekStartDates.map(d => d.toISOString()).join(', ')}`);
+    console.log(`[ShiftCreate] Templates: ${templates.map(t => `${t.shiftType}(${(t as any).startTime})`).join(', ')}`);
+    console.log(`[ShiftCreate] Schedules created/found: ${scheduleMap.size}`);
 
     // Build a map of day letter occurrences for each worker
     // For monthly data, shifts with the same day letter are in chronological order
@@ -523,9 +551,9 @@ export class HoursImportService {
               },
             });
             assignmentsCreated++;
-          } catch (err) {
+          } catch (err: any) {
             // May fail on unique constraint if data is weird - log and continue
-            console.error(`Failed to create assignment for ${worker.name} on ${shiftDate.toISOString()}:`, err);
+            console.error(`[ShiftCreate] FAILED for ${worker.name} on ${shiftDate.toISOString()}: ${err.message}`);
           }
         }
       }
@@ -1075,54 +1103,85 @@ export class HoursImportService {
 
   private extractShiftFromRow(row: string[], day: string): ParsedShift | null {
     // Find hours and time values from the row
+    // Excel columns (RTL): שם | יום | שבת | הפסקה | 150% | 125% | 100% | סה"כ | יציאה | כניסה | תאריך
     let totalHours = 0;
     let startTime: string | null = null;
     let endTime: string | null = null;
 
     const timeValues: string[] = [];
     const numberValues: number[] = [];
+    const durationValues: number[] = []; // For H:MM format hours (like 5:58 = 5.97h)
 
     for (const cell of row) {
+      const trimmed = String(cell).trim();
+      if (!trimmed || trimmed === '0') continue;
+
       // Check for time pattern HH:MM or H:MM
-      if (/^\d{1,2}:\d{2}$/.test(cell)) {
-        const [h, m] = cell.split(':').map(Number);
+      if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+        const [h, m] = trimmed.split(':').map(Number);
         if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
-          timeValues.push(cell);
+          const hoursValue = h + m / 60;
+          // Classify: clock times (entry/exit) are typically >= 6:00 and <= 23:59
+          // Duration hours (total worked) are typically < 15 hours
+          if (h >= 6 && h <= 23) {
+            timeValues.push(trimmed); // Likely a clock time (entry/exit)
+          }
+          // If it looks like duration (under 15 hours), also track as duration
+          if (hoursValue > 0 && hoursValue < 15) {
+            durationValues.push(hoursValue);
+          }
         }
       }
 
       // Check for decimal hours (like 5.36, 6.26)
-      const num = parseFloat(cell);
-      if (!isNaN(num) && num > 0 && num < 24 && cell.includes('.')) {
+      const num = parseFloat(trimmed);
+      if (!isNaN(num) && num > 0 && num < 24 && trimmed.includes('.')) {
         numberValues.push(num);
       }
     }
 
-    // The row typically has: כניסה (entry/start), יציאה (exit/end), סה"כ (total hours)
-    // In RTL: the first time is usually start time, second is end time
+    // Separate clock times from duration values
+    // Clock times: typically >= 6:00 (entry around 8-18, exit around 15-00)
+    // Sort time values by hour to identify entry (earlier) and exit (later)
+    // In RTL Excel: last time column = entry (כניסה), second to last = exit (יציאה)
     if (timeValues.length >= 2) {
-      startTime = timeValues[timeValues.length - 1]; // Last time value = entry (כניסה)
+      startTime = timeValues[timeValues.length - 1]; // Last = entry (כניסה)
       endTime = timeValues[timeValues.length - 2];   // Second to last = exit (יציאה)
     } else if (timeValues.length === 1) {
       startTime = timeValues[0];
     }
 
-    // Total hours - look for the largest decimal number
+    // Total hours - prefer decimal values (like 5.96), then duration H:MM values
     if (numberValues.length > 0) {
       totalHours = Math.max(...numberValues);
     }
 
-    // Also check for hour:minute format in "סה"כ" column (e.g., "5:22" meaning 5h 22min)
-    for (const cell of row) {
-      if (/^\d{1,2}:\d{2}$/.test(cell)) {
-        const [h, m] = cell.split(':').map(Number);
-        const hours = h + m / 60;
-        if (hours > 3 && hours < 18) { // Reasonable shift length
-          if (hours > totalHours) {
-            totalHours = hours;
-          }
+    // If no decimal number found, use the smallest duration value
+    // (the total hours column is usually the smallest H:MM value)
+    if (totalHours === 0 && durationValues.length > 0) {
+      // The duration is usually the value that doesn't match start/end times
+      const startHours = startTime ? parseInt(startTime.split(':')[0]) + parseInt(startTime.split(':')[1]) / 60 : -1;
+      const endHours = endTime ? parseInt(endTime.split(':')[0]) + parseInt(endTime.split(':')[1]) / 60 : -1;
+      
+      for (const dur of durationValues) {
+        // Skip values that match start or end times (within 0.1h tolerance)
+        if (Math.abs(dur - startHours) < 0.1) continue;
+        if (Math.abs(dur - endHours) < 0.1) continue;
+        // Pick the first non-clock-time duration
+        if (dur > 0 && dur < 15) {
+          totalHours = dur;
+          break;
         }
       }
+    }
+
+    // If still no hours, try to calculate from start/end times
+    if (totalHours === 0 && startTime && endTime) {
+      const [sh, sm] = startTime.split(':').map(Number);
+      const [eh, em] = endTime.split(':').map(Number);
+      let diff = (eh - sh) + (em - sm) / 60;
+      if (diff < 0) diff += 24;
+      totalHours = diff;
     }
 
     if (totalHours === 0) return null;
