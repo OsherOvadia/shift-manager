@@ -24,7 +24,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
-const SHIFT_TYPES = [
+const ALL_SHIFT_TYPES = [
   { value: 'MORNING', label: 'בוקר', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
   { value: 'EVENING', label: 'ערב', color: 'bg-blue-100 text-blue-800 border-blue-300' },
   { value: 'EVENING_CLOSE', label: 'ערב + סגירה', color: 'bg-purple-100 text-purple-800 border-purple-300' },
@@ -71,6 +71,10 @@ export default function ManageSchedulePage() {
       setClosedPeriods(settings.closedPeriods)
     }
   }, [settings])
+
+  const SHIFT_TYPES = ALL_SHIFT_TYPES.filter(st =>
+    (settings?.enabledShiftTypes || ['MORNING', 'EVENING']).includes(st.value)
+  )
 
   // Fetch employees
   const { data: employees } = useQuery({

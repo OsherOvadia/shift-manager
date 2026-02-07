@@ -100,6 +100,7 @@ model BusinessSettings {
   defaultHourlyWage      Float    @default(30) @map("default_hourly_wage")
   defaultWages           Json?    @default("{}") @map("default_wages")
   shiftRequirements      Json?    @default("{}") @map("shift_requirements")
+  enabledShiftTypes      Json?    @default("[\"MORNING\",\"EVENING\"]") @map("enabled_shift_types")
   createdAt              DateTime @default(now()) @map("created_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

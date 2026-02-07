@@ -7,29 +7,32 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
-import { isAdmin } from '@/lib/auth'
+import { useAuthStore } from '@/lib/auth'
 import { AlertTriangle, Loader2, ShieldAlert, Trash2 } from 'lucide-react'
+
+const SUPER_ADMIN_EMAIL = 'oser130309@gmail.com'
 
 export default function AdminResetPage() {
   const { toast } = useToast()
   const router = useRouter()
-  const isAdminRole = isAdmin()
+  const { accessToken, user } = useAuthStore()
 
-  const [secret, setSecret] = useState('')
   const [organizationName, setOrganizationName] = useState('')
   const [confirmText, setConfirmText] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
 
-  // Redirect non-admin users
-  if (!isAdminRole) {
+  // Only allow the super admin email
+  const isSuperAdmin = user?.email === SUPER_ADMIN_EMAIL
+
+  if (!isSuperAdmin) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <Card className="max-w-md w-full">
           <CardContent className="p-8 text-center">
             <ShieldAlert className="h-12 w-12 text-destructive mx-auto mb-4" />
             <h2 className="text-xl font-bold mb-2">אין גישה</h2>
-            <p className="text-muted-foreground">עמוד זה זמין למנהלי מערכת בלבד</p>
+            <p className="text-muted-foreground">עמוד זה זמין למנהל הראשי בלבד</p>
             <Button className="mt-4" onClick={() => router.push('/dashboard')}>
               חזרה לדשבורד
             </Button>
@@ -42,7 +45,7 @@ export default function AdminResetPage() {
   const isConfirmed = confirmText === 'מחק הכל'
 
   const handleReset = async () => {
-    if (!secret || !organizationName || !isConfirmed) return
+    if (!organizationName || !isConfirmed || !accessToken) return
 
     setIsLoading(true)
     setResult(null)
@@ -51,8 +54,11 @@ export default function AdminResetPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
       const response = await fetch(`${apiUrl}/database-reset/reset-organization`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret, organizationName }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ organizationName }),
       })
 
       const data = await response.json()
@@ -119,20 +125,6 @@ export default function AdminResetPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="secret">מפתח סודי (DB_RESET_SECRET)</Label>
-            <Input
-              id="secret"
-              type="password"
-              placeholder="הכנס את המפתח הסודי"
-              value={secret}
-              onChange={(e) => setSecret(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              המפתח הסודי מוגדר במשתני הסביבה של השרת
-            </p>
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="orgName">שם הארגון</Label>
             <Input
               id="orgName"
@@ -159,7 +151,7 @@ export default function AdminResetPage() {
           <Button
             variant="destructive"
             className="w-full h-12 text-base gap-2"
-            disabled={!secret || !organizationName || !isConfirmed || isLoading}
+            disabled={!organizationName || !isConfirmed || isLoading}
             onClick={handleReset}
           >
             {isLoading ? (

@@ -12,7 +12,7 @@ import { Loader2, ChevronRight, ChevronLeft, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 
-const SHIFT_TYPES = [
+const ALL_SHIFT_TYPES = [
   { value: 'MORNING', label: 'בוקר', color: 'bg-yellow-100 text-yellow-800' },
   { value: 'EVENING', label: 'ערב', color: 'bg-blue-100 text-blue-800' },
   { value: 'EVENING_CLOSE', label: 'ערב + סגירה', color: 'bg-purple-100 text-purple-800' },
@@ -42,6 +42,10 @@ export default function SchedulePage() {
       setWeekendDays(settings.weekendDays)
     }
   }, [settings])
+
+  const SHIFT_TYPES = ALL_SHIFT_TYPES.filter(st =>
+    (settings?.enabledShiftTypes || ['MORNING', 'EVENING']).includes(st.value)
+  )
 
   const { data: schedules, isLoading: schedulesLoading } = useQuery({
     queryKey: ['schedules'],

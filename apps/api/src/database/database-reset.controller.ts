@@ -1,73 +1,40 @@
-import { Controller, Get, Post, Body, Query, UnauthorizedException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, UnauthorizedException, InternalServerErrorException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
+// Only this email can perform organization resets
+const SUPER_ADMIN_EMAIL = 'oser130309@gmail.com';
 
 @Controller('database-reset')
 export class DatabaseResetController {
   constructor(private readonly prisma: PrismaService) {}
-
-  @Get()
-  async resetDatabase(@Query('secret') secret: string) {
-    // Check if secret matches
-    const RESET_SECRET = process.env.DB_RESET_SECRET || 'CHANGE_THIS_SECRET_12345';
-    
-    if (!secret || secret !== RESET_SECRET) {
-      throw new UnauthorizedException('Invalid reset secret');
-    }
-
-    try {
-      // Get all table names from the schema
-      const tables = await this.prisma.$queryRaw<Array<{ tablename: string }>>`
-        SELECT tablename FROM pg_tables WHERE schemaname='public'
-      `;
-
-      // Drop all tables
-      for (const { tablename } of tables) {
-        if (tablename !== '_prisma_migrations') {
-          await this.prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "${tablename}" CASCADE`);
-        }
-      }
-
-      // Drop migrations table too for clean slate
-      await this.prisma.$executeRaw`DROP TABLE IF EXISTS "_prisma_migrations" CASCADE`;
-
-      // Disconnect and reconnect
-      await this.prisma.$disconnect();
-
-      return {
-        success: true,
-        message: 'Database reset successfully! All tables dropped. Redeploy your API to recreate schema.',
-        instructions: [
-          '1. Go to Render dashboard',
-          '2. Click on your shift-manager-api service',
-          '3. Click "Manual Deploy" → "Clear build cache & deploy"',
-          '4. Prisma will recreate all tables automatically',
-          '5. IMPORTANT: Remove DB_RESET_SECRET from environment variables after reset',
-        ],
-      };
-    } catch (error) {
-      throw new InternalServerErrorException({
-        message: 'Failed to reset database',
-        error: error.message,
-      });
-    }
-  }
 
   /**
    * Reset all data for a specific organization while keeping:
    * - The table structure (no schema changes)
    * - MANAGER and ADMIN accounts
    * 
-   * Deletes: employees, shifts, schedules, availability, notifications,
-   * revenues, expenses, assignments, job categories, settings, cook hours, etc.
+   * Only the super admin (oser130309@gmail.com) can perform this action.
    */
   @Post('reset-organization')
+  @UseGuards(JwtAuthGuard)
   async resetOrganization(
-    @Body() body: { secret: string; organizationName: string },
+    @Request() req: any,
+    @Body() body: { organizationName: string },
   ) {
-    const RESET_SECRET = process.env.DB_RESET_SECRET || 'CHANGE_THIS_SECRET_12345';
+    // Verify the requesting user is the super admin
+    const userId = req.user?.sub || req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Authentication required');
+    }
 
-    if (!body.secret || body.secret !== RESET_SECRET) {
-      throw new UnauthorizedException('Invalid reset secret');
+    const requestingUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, role: true },
+    });
+
+    if (!requestingUser || requestingUser.email !== SUPER_ADMIN_EMAIL) {
+      throw new ForbiddenException('Only the super admin can reset organizations');
     }
 
     if (!body.organizationName || !body.organizationName.trim()) {
@@ -226,7 +193,7 @@ export class DatabaseResetController {
         },
       };
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
       throw new InternalServerErrorException({

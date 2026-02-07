@@ -12,7 +12,7 @@ import { useAuthStore } from '@/lib/auth'
 import { getWeekStartDate, getWeekDates, getDayLetter, formatShortDate } from '@/lib/utils'
 import { Loader2, ChevronRight, ChevronLeft, Check, X, AlertTriangle } from 'lucide-react'
 
-const SHIFT_TYPES = [
+const ALL_SHIFT_TYPES = [
   { value: 'MORNING', label: 'בוקר' },
   { value: 'EVENING', label: 'ערב' },
   { value: 'EVENING_CLOSE', label: 'ערב + סגירה' },
@@ -48,6 +48,16 @@ export default function ManageAvailabilityPage() {
       ),
     enabled: !!accessToken,
   })
+
+  const { data: settings } = useQuery({
+    queryKey: ['business-settings'],
+    queryFn: () => api.get<any>('/settings', accessToken!),
+    enabled: !!accessToken,
+  })
+
+  const SHIFT_TYPES = ALL_SHIFT_TYPES.filter(st =>
+    (settings?.enabledShiftTypes || ['MORNING', 'EVENING']).includes(st.value)
+  )
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>

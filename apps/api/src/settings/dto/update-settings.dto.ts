@@ -42,4 +42,8 @@ export class UpdateSettingsDto {
     FULL_TIME?: { minShifts: number; minWeekendShifts: number };
     PART_TIME?: { minShifts: number; minWeekendShifts: number };
   };
+
+  @IsArray()
+  @IsOptional()
+  enabledShiftTypes?: string[]; // e.g. ['MORNING', 'EVENING'] or ['MORNING', 'EVENING', 'EVENING_CLOSE']
 }

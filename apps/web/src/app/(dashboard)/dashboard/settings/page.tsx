@@ -73,7 +73,14 @@ interface SettingsFormData {
   defaultHourlyWage: number
   defaultWages: DefaultWages
   shiftRequirements: ShiftRequirements
+  enabledShiftTypes: string[]
 }
+
+const ALL_SHIFT_TYPES = [
+  { value: 'MORNING', label: 'בוקר', description: 'משמרת בוקר (11:00-18:00)' },
+  { value: 'EVENING', label: 'ערב', description: 'משמרת ערב (18:00-סגירה)' },
+  { value: 'EVENING_CLOSE', label: 'ערב + סגירה', description: 'משמרת ערב עם סגירה (18:00-00:00)' },
+]
 
 export default function SettingsPage() {
   const { toast } = useToast()
@@ -107,8 +114,11 @@ export default function SettingsPage() {
         FULL_TIME: { minShifts: 5, minWeekendShifts: 2 },
         PART_TIME: { minShifts: 3, minWeekendShifts: 1 },
       },
+      enabledShiftTypes: ['MORNING', 'EVENING'],
     },
   })
+
+  const enabledShiftTypes = watch('enabledShiftTypes')
 
   const weekendDays = watch('weekendDays')
   const closedPeriods = watch('closedPeriods')
@@ -138,6 +148,7 @@ export default function SettingsPage() {
             minWeekendShifts: settings.shiftRequirements?.PART_TIME?.minWeekendShifts ?? 1,
           },
         },
+        enabledShiftTypes: settings.enabledShiftTypes || ['MORNING', 'EVENING'],
       })
     }
   }, [settings, reset])
@@ -214,6 +225,20 @@ export default function SettingsPage() {
     }
   }
 
+  const toggleShiftType = (shiftType: string) => {
+    const current = enabledShiftTypes || []
+    if (current.includes(shiftType)) {
+      // Don't allow removing if it's the last one
+      if (current.length <= 1) return
+      setValue('enabledShiftTypes', current.filter((t) => t !== shiftType))
+    } else {
+      setValue('enabledShiftTypes', [...current, shiftType])
+    }
+  }
+
+  // Filter the shift types shown in the closed periods section
+  const activeShiftTypes = SHIFT_TYPES.filter(st => (enabledShiftTypes || []).includes(st.value))
+
   const onSubmit = (data: SettingsFormData) => {
     updateMutation.mutate(data)
   }
@@ -260,6 +285,39 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Enabled Shift Types */}
+          <Card>
+            <CardHeader>
+              <CardTitle>סוגי משמרות פעילים</CardTitle>
+              <CardDescription>
+                בחר אילו סוגי משמרות יוצגו במערכת. ברירת מחדל: בוקר + ערב (ללא הפרדה בין ערב לערב+סגירה)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {ALL_SHIFT_TYPES.map((st) => (
+                  <div key={st.value} className="flex items-center gap-3">
+                    <Checkbox
+                      id={`shift-type-${st.value}`}
+                      checked={(enabledShiftTypes || []).includes(st.value)}
+                      onCheckedChange={() => toggleShiftType(st.value)}
+                      disabled={(enabledShiftTypes || []).length <= 1 && (enabledShiftTypes || []).includes(st.value)}
+                    />
+                    <div>
+                      <Label htmlFor={`shift-type-${st.value}`} className="cursor-pointer font-medium">
+                        {st.label}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">{st.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">
+                אם &quot;ערב + סגירה&quot; כבוי, כל משמרות הערב יטופלו כמשמרת ערב אחת מאוחדת
+              </p>
             </CardContent>
           </Card>
 
@@ -498,7 +556,7 @@ export default function SettingsPage() {
                     <div key={day.value} className="space-y-2">
                       <Label className="font-semibold">{day.label}</Label>
                       <div className="flex flex-wrap gap-4 mr-4">
-                        {SHIFT_TYPES.map((shift) => (
+                        {activeShiftTypes.map((shift) => (
                           <div key={shift.value} className="flex items-center gap-2">
                             <Checkbox
                               id={`closed-${day.value}-${shift.value}`}

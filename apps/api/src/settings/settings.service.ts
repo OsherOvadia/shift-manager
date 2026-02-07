@@ -77,6 +77,9 @@ export class SettingsService {
     if (updateDto.shiftRequirements !== undefined) {
       dataToSave.shiftRequirements = updateDto.shiftRequirements;
     }
+    if (updateDto.enabledShiftTypes !== undefined) {
+      dataToSave.enabledShiftTypes = updateDto.enabledShiftTypes;
+    }
 
     if (!settings) {
       // Create with provided values

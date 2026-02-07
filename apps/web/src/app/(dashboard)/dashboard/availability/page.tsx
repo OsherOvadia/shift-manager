@@ -13,7 +13,7 @@ import { getWeekStartDate, getWeekDates, getDayName, formatShortDate, isWeekend,
 import { Loader2, ChevronRight, ChevronLeft, Save, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const SHIFT_TYPES = [
+const ALL_SHIFT_TYPES = [
   { value: 'MORNING', label: 'בוקר', time: '11:00-18:00' },
   { value: 'EVENING', label: 'ערב', time: '18:00-22:00' },
   { value: 'EVENING_CLOSE', label: 'ערב + סגירה', time: '18:00-00:00' },
@@ -33,6 +33,7 @@ export default function AvailabilityPage() {
   const [selectedSlots, setSelectedSlots] = useState<Map<string, AvailabilitySlot>>(new Map())
   const [weekendDays, setWeekendDays] = useState<number[]>([4, 5, 6]) // Thu, Fri, Sat
   const [closedPeriods, setClosedPeriods] = useState<Array<{ day: number; shiftTypes: string[] }>>([])
+  const [enabledShiftTypes, setEnabledShiftTypes] = useState<string[]>(['MORNING', 'EVENING'])
   
   const currentWeekStart = getWeekStartDate(new Date())
   const targetWeekStart = new Date(currentWeekStart)
@@ -46,7 +47,7 @@ export default function AvailabilityPage() {
     enabled: !!accessToken,
   })
 
-  // Update weekend days, closed periods, and shift requirements when settings are loaded
+  // Update weekend days, closed periods, and enabled shift types when settings are loaded
   useEffect(() => {
     if (settings?.weekendDays) {
       setWeekendDays(settings.weekendDays)
@@ -54,7 +55,12 @@ export default function AvailabilityPage() {
     if (settings?.closedPeriods) {
       setClosedPeriods(settings.closedPeriods)
     }
+    if (settings?.enabledShiftTypes) {
+      setEnabledShiftTypes(settings.enabledShiftTypes)
+    }
   }, [settings])
+
+  const SHIFT_TYPES = ALL_SHIFT_TYPES.filter(st => enabledShiftTypes.includes(st.value))
 
   const { data: existingSubmission, isLoading } = useQuery({
     queryKey: ['availability', targetWeekStart.toISOString()],
