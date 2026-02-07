@@ -84,6 +84,8 @@ export default function SchedulePage() {
       return data
     },
     enabled: !!currentSchedule?.id && !!accessToken,
+    staleTime: 0, // Always fetch fresh data
+    cacheTime: 0, // Don't cache
   })
 
   // Fetch employees for kitchen staff section
