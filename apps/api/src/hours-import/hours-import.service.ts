@@ -71,8 +71,12 @@ const DEPARTMENT_TO_CATEGORY: { [key: string]: { category: string; isTipBased: b
   'מלצרית': { category: 'waiter', isTipBased: true },
   'אחמשית': { category: 'waiter', isTipBased: true },
   'אח"מ': { category: 'waiter', isTipBased: true },
+  'אחראי משמרת': { category: 'waiter', isTipBased: true },
+  'אחראי': { category: 'waiter', isTipBased: true },
   'טבח': { category: 'cook', isTipBased: false },
   'טבחית': { category: 'cook', isTipBased: false },
+  'סושימן': { category: 'sushi', isTipBased: false },
+  'סושי': { category: 'sushi', isTipBased: false },
   'שוטף': { category: 'dishwasher', isTipBased: false },
   'שוטף כלים': { category: 'dishwasher', isTipBased: false },
 };
@@ -155,11 +159,12 @@ export class HoursImportService {
       workerMapping,
     );
 
-    // Fetch default hourly wage from settings
+    // Fetch default hourly wage and per-category wages from settings
     const settings = await this.prisma.businessSettings.findUnique({
       where: { organizationId },
     });
     const defaultWage = (settings as any)?.defaultHourlyWage ?? 30;
+    const defaultWages: { [key: string]: number } = (settings as any)?.defaultWages || {};
 
     // Fetch job categories for auto-assignment
     const jobCategories = await this.prisma.jobCategory.findMany({
@@ -194,6 +199,7 @@ export class HoursImportService {
           worker.name,
           organizationId,
           defaultWage,
+          defaultWages,
           worker.category,
           jobCategories,
           createdNames,
@@ -253,6 +259,7 @@ export class HoursImportService {
     name: string,
     organizationId: string,
     defaultWage: number,
+    defaultWages: { [key: string]: number },
     category: string,
     jobCategories: any[],
     createdNames: Map<string, number>,
@@ -316,6 +323,15 @@ export class HoursImportService {
       }
     }
 
+    // Determine the wage: use per-category wage if available, otherwise the general default
+    let wage = defaultWage;
+    if (categoryLower) {
+      const mapping = DEPARTMENT_TO_CATEGORY[categoryLower];
+      if (mapping && defaultWages[mapping.category] !== undefined) {
+        wage = defaultWages[mapping.category];
+      }
+    }
+
     const userData: any = {
       email: placeholderEmail,
       passwordHash,
@@ -326,7 +342,7 @@ export class HoursImportService {
       organizationId,
       isApproved: true,
       isActive: true,
-      hourlyWage: defaultWage,
+      hourlyWage: wage,
       isTipBased,
     };
 

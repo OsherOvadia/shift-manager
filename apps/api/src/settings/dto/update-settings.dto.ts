@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsNumber, IsOptional, Min, Max, ArrayMinSize, ArrayMaxSize } from 'class-validator';
+import { IsArray, IsInt, IsNumber, IsOptional, IsObject, Min, Max, ArrayMinSize, ArrayMaxSize } from 'class-validator';
 
 export class UpdateSettingsDto {
   @IsArray()
@@ -31,4 +31,8 @@ export class UpdateSettingsDto {
   @Min(0)
   @IsOptional()
   defaultHourlyWage?: number;
+
+  @IsObject()
+  @IsOptional()
+  defaultWages?: { [categoryName: string]: number }; // e.g. { waiter: 30, cook: 35, sushi: 40 }
 }

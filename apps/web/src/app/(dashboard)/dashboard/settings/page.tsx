@@ -47,12 +47,21 @@ interface ClosedPeriod {
   shiftTypes: string[]
 }
 
+interface DefaultWages {
+  waiter: number
+  cook: number
+  sushi: number
+  dishwasher: number
+  [key: string]: number
+}
+
 interface SettingsFormData {
   weekendDays: number[]
   submissionDeadlineDay: number
   submissionDeadlineHour: number
   closedPeriods: ClosedPeriod[]
   defaultHourlyWage: number
+  defaultWages: DefaultWages
 }
 
 export default function SettingsPage() {
@@ -82,6 +91,7 @@ export default function SettingsPage() {
       submissionDeadlineHour: 18,
       closedPeriods: [],
       defaultHourlyWage: 30,
+      defaultWages: { waiter: 30, cook: 35, sushi: 40, dishwasher: 28 },
     },
   })
 
@@ -96,6 +106,13 @@ export default function SettingsPage() {
         submissionDeadlineHour: settings.submissionDeadlineHour ?? 18,
         closedPeriods: settings.closedPeriods || [],
         defaultHourlyWage: settings.defaultHourlyWage ?? 30,
+        defaultWages: {
+          waiter: settings.defaultWages?.waiter ?? 30,
+          cook: settings.defaultWages?.cook ?? 35,
+          sushi: settings.defaultWages?.sushi ?? 40,
+          dishwasher: settings.defaultWages?.dishwasher ?? 28,
+          ...settings.defaultWages,
+        },
       })
     }
   }, [settings, reset])
@@ -275,24 +292,93 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Default Hourly Wage */}
+          {/* Default Wages per Category */}
           <Card>
             <CardHeader>
-              <CardTitle>שכר שעתי ברירת מחדל</CardTitle>
+              <CardTitle>שכר שעתי ברירת מחדל לפי תפקיד</CardTitle>
               <CardDescription>
-                שכר שעתי שייקבע אוטומטית לעובדים חדשים שנוצרים מהעלאת קובץ שעות
+                שכר שייקבע אוטומטית לעובדים חדשים לפי התפקיד שזוהה מקובץ השעות. ניתן לערוך לכל עובד בנפרד בעמוד העובדים.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-3 max-w-xs">
-                <Input
-                  type="number"
-                  min={0}
-                  step={0.5}
-                  {...register('defaultHourlyWage', { valueAsNumber: true })}
-                  className="text-lg h-11"
-                />
-                <span className="text-muted-foreground text-sm whitespace-nowrap">₪ לשעה</span>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span className="h-3 w-3 rounded-full bg-blue-500" />
+                    מלצר / אחראי משמרת
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      {...register('defaultWages.waiter', { valueAsNumber: true })}
+                      className="h-10"
+                    />
+                    <span className="text-muted-foreground text-sm whitespace-nowrap">₪/שעה</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span className="h-3 w-3 rounded-full bg-orange-500" />
+                    טבח
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      {...register('defaultWages.cook', { valueAsNumber: true })}
+                      className="h-10"
+                    />
+                    <span className="text-muted-foreground text-sm whitespace-nowrap">₪/שעה</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span className="h-3 w-3 rounded-full bg-pink-500" />
+                    סושימן
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      {...register('defaultWages.sushi', { valueAsNumber: true })}
+                      className="h-10"
+                    />
+                    <span className="text-muted-foreground text-sm whitespace-nowrap">₪/שעה</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span className="h-3 w-3 rounded-full bg-teal-500" />
+                    שוטף כלים
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      {...register('defaultWages.dishwasher', { valueAsNumber: true })}
+                      className="h-10"
+                    />
+                    <span className="text-muted-foreground text-sm whitespace-nowrap">₪/שעה</span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t">
+                <Label className="text-muted-foreground text-sm">שכר כללי (עובדים ללא תפקיד מזוהה)</Label>
+                <div className="flex items-center gap-2 mt-1.5 max-w-xs">
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    {...register('defaultHourlyWage', { valueAsNumber: true })}
+                    className="h-10"
+                  />
+                  <span className="text-muted-foreground text-sm whitespace-nowrap">₪/שעה</span>
+                </div>
               </div>
             </CardContent>
           </Card>

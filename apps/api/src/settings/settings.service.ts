@@ -71,6 +71,9 @@ export class SettingsService {
     if (updateDto.defaultHourlyWage !== undefined) {
       dataToSave.defaultHourlyWage = updateDto.defaultHourlyWage;
     }
+    if (updateDto.defaultWages !== undefined) {
+      dataToSave.defaultWages = updateDto.defaultWages;
+    }
 
     if (!settings) {
       // Create with provided values
