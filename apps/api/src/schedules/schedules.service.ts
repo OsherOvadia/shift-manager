@@ -57,6 +57,14 @@ export class SchedulesService {
                 firstName: true,
                 lastName: true,
                 employmentType: true,
+                jobCategory: {
+                  select: {
+                    id: true,
+                    name: true,
+                    nameHe: true,
+                    color: true,
+                  },
+                },
               },
             },
             shiftTemplate: true,
