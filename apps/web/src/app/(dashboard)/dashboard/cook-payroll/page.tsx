@@ -85,12 +85,42 @@ export default function CookPayrollPage() {
     }
   }, [isAdminOrManager, router])
 
-  // Fetch payroll data for the week
+  // Fetch payroll data for the week (from CookWeeklyHours table)
   const { data: payrollData, isLoading } = useQuery<PayrollData>({
     queryKey: ['cook-payroll', weekStart.toISOString()],
     queryFn: () => api.get(`/cook-payroll/week/${weekStart.toISOString()}`, accessToken!),
     enabled: !!accessToken && isAdminOrManager,
   })
+
+  // FALLBACK: Fetch hours from shift assignments if CookWeeklyHours is empty
+  const hasMissingHours = payrollData?.cooks?.some(c => c.totalHours === 0) || false
+  const { data: shiftBasedHours } = useQuery<PayrollData>({
+    queryKey: ['cook-shift-hours', weekStart.toISOString()],
+    queryFn: () => api.get(`/cook-payroll/week/${weekStart.toISOString()}/from-shifts`, accessToken!),
+    enabled: !!accessToken && isAdminOrManager && hasMissingHours,
+  })
+
+  // Merge payroll data with shift-based fallback
+  const mergedPayrollData = payrollData ? {
+    ...payrollData,
+    cooks: payrollData.cooks.map(cook => {
+      if (cook.totalHours > 0) return cook // Already has data from CookWeeklyHours
+      
+      // Find fallback data from shifts
+      const fallback = shiftBasedHours?.cooks?.find(fb => fb.userId === cook.userId)
+      if (fallback) {
+        console.log(`[CookPayroll] Using fallback hours for ${cook.firstName}: ${fallback.totalHours}h`)
+        return {
+          ...cook,
+          totalHours: fallback.totalHours,
+          totalEarnings: fallback.totalEarnings,
+          notes: fallback.notes,
+        }
+      }
+      
+      return cook // No fallback available
+    })
+  } : null
 
   // Fetch weekly comparison data
   const { data: comparisonData } = useQuery<any[]>({
@@ -101,12 +131,12 @@ export default function CookPayrollPage() {
 
   // Initialize edited values when data loads
   useEffect(() => {
-    if (payrollData?.cooks) {
+    if (mergedPayrollData?.cooks) {
       const hours: { [key: string]: string } = {}
       const wages: { [key: string]: string } = {}
       const notes: { [key: string]: string } = {}
       
-      payrollData.cooks.forEach(cook => {
+      mergedPayrollData.cooks.forEach(cook => {
         hours[cook.userId] = cook.totalHours.toString()
         wages[cook.userId] = cook.hourlyWage.toString()
         notes[cook.userId] = cook.notes || ''
@@ -121,7 +151,7 @@ export default function CookPayrollPage() {
       setSavedWages(wages)
       setSavedNotes(notes)
     }
-  }, [payrollData])
+  }, [mergedPayrollData])
 
   // Save cook hours mutation
   const saveCookHoursMutation = useMutation({
@@ -170,12 +200,12 @@ export default function CookPayrollPage() {
   }
 
   const calculateTotals = () => {
-    if (!payrollData?.cooks) return { totalHours: 0, totalEarnings: 0 }
+    if (!mergedPayrollData?.cooks) return { totalHours: 0, totalEarnings: 0 }
     
     let totalHours = 0
     let totalEarnings = 0
     
-    payrollData.cooks.forEach(cook => {
+    mergedPayrollData.cooks.forEach(cook => {
       const hours = parseFloat(editedHours[cook.userId] || '0')
       const wage = parseFloat(editedWages[cook.userId] || '0')
       totalHours += hours
@@ -269,7 +299,7 @@ export default function CookPayrollPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{payrollData?.cooks?.length || 0}</div>
+                <div className="text-2xl font-bold">{mergedPayrollData?.cooks?.length || 0}</div>
               </CardContent>
             </Card>
           </StaggerItem>
@@ -312,13 +342,13 @@ export default function CookPayrollPage() {
               <div className="flex justify-center p-8">
                 <Loader2 className="h-8 w-8 animate-spin" />
               </div>
-            ) : payrollData?.cooks?.length === 0 ? (
+            ) : mergedPayrollData?.cooks?.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 לא נמצאו עובדי מטבח
               </div>
             ) : (
               <div className="space-y-4">
-                {payrollData?.cooks?.map((cook) => (
+                {mergedPayrollData?.cooks?.map((cook) => (
                   <motion.div
                     key={cook.userId}
                     className="p-4 border rounded-lg space-y-4"

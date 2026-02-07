@@ -30,6 +30,16 @@ export class CookPayrollController {
   }
 
   /**
+   * FALLBACK: Get cook hours calculated from ShiftAssignment table.
+   * Used when CookWeeklyHours is empty (e.g., after DB reset).
+   */
+  @Get('week/:date/from-shifts')
+  getHoursFromShifts(@Param('date') date: string, @Request() req: any) {
+    const weekDate = new Date(date);
+    return this.cookPayrollService.getHoursFromShifts(weekDate, req.user.organizationId);
+  }
+
+  /**
    * Get weekly comparison for charting
    */
   @Get('comparison')

@@ -257,6 +257,112 @@ export class CookPayrollService {
   }
 
   /**
+   * FALLBACK: Get cook hours from ShiftAssignment table when CookWeeklyHours is empty.
+   * This is a backup for when populateCookWeeklyHours() fails to populate data.
+   */
+  async getHoursFromShifts(weekStart: Date, organizationId: string) {
+    const normalizedWeekStart = this.normalizeToWeekStart(weekStart);
+    const weekEnd = new Date(normalizedWeekStart);
+    weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
+
+    console.log(`[CookPayroll-Fallback] Fetching hours from shifts for week ${normalizedWeekStart.toISOString()}`);
+
+    // Get all kitchen staff (cook, sushi)
+    const kitchenStaff = await this.prisma.user.findMany({
+      where: {
+        organizationId,
+        isActive: true,
+        jobCategory: {
+          name: {
+            in: ['cook', 'sushi', 'chef'],
+          },
+        },
+      },
+      include: {
+        jobCategory: {
+          select: {
+            id: true,
+            name: true,
+            nameHe: true,
+            color: true,
+          },
+        },
+      },
+    });
+
+    console.log(`[CookPayroll-Fallback] Found ${kitchenStaff.length} kitchen staff`);
+
+    // Calculate hours from shift assignments for each kitchen worker
+    const results = [];
+    for (const user of kitchenStaff) {
+      const assignments = await this.prisma.shiftAssignment.findMany({
+        where: {
+          userId: user.id,
+          shiftDate: {
+            gte: normalizedWeekStart,
+            lt: weekEnd,
+          },
+          status: { not: 'CANCELLED' },
+        },
+        include: {
+          shiftTemplate: {
+            select: {
+              startTime: true,
+              endTime: true,
+            },
+          },
+        },
+      });
+
+      // Calculate total hours from assignments
+      const totalHours = assignments.reduce((sum, a) => {
+        // Use actualHours if available, otherwise calculate from times
+        if (a.actualHours !== null && a.actualHours !== undefined) {
+          return sum + a.actualHours;
+        }
+
+        const startTime = a.actualStartTime || a.shiftTemplate.startTime;
+        const endTime = a.actualEndTime || a.shiftTemplate.endTime;
+        const [startHour, startMin] = startTime.split(':').map(Number);
+        const [endHour, endMin] = endTime.split(':').map(Number);
+        let hours = endHour - startHour + (endMin - startMin) / 60;
+        if (hours < 0) hours += 24; // Handle overnight shifts
+        
+        return sum + hours;
+      }, 0);
+
+      console.log(`[CookPayroll-Fallback] ${user.firstName}: ${assignments.length} assignments, ${totalHours.toFixed(2)} hours`);
+
+      results.push({
+        userId: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        jobCategory: user.jobCategory,
+        hourlyWage: user.hourlyWage,
+        totalHours: Math.round(totalHours * 100) / 100,
+        totalEarnings: Math.round(totalHours * user.hourlyWage * 100) / 100,
+        notes: `מחושב מ-${assignments.length} משמרות`,
+        entryId: null,
+        source: 'shifts', // Mark as fallback data
+      });
+    }
+
+    const totals = {
+      totalHours: results.reduce((sum, r) => sum + r.totalHours, 0),
+      totalEarnings: results.reduce((sum, r) => sum + r.totalEarnings, 0),
+      cookCount: results.length,
+    };
+
+    console.log(`[CookPayroll-Fallback] Total: ${results.length} kitchen staff, ${totals.totalHours.toFixed(2)} hours`);
+
+    return {
+      weekStart: normalizedWeekStart.toISOString(),
+      cooks: results,
+      totals,
+    };
+  }
+
+  /**
    * Normalize date to week start (Sunday)
    */
   private normalizeToWeekStart(date: Date): Date {

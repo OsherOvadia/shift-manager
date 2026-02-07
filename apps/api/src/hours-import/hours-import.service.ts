@@ -86,6 +86,52 @@ export class HoursImportService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * Ensure all standard job categories exist for this organization.
+   * Called at the START of every Excel import since user resets DB.
+   * Returns a Map of category name -> category ID for quick lookup.
+   */
+  private async ensureJobCategories(organizationId: string): Promise<Map<string, string>> {
+    console.log('[JobCategories] Initializing standard job categories...');
+    
+    const standardCategories = [
+      { name: 'cook', nameHe: 'טבח', color: '#FF6B35' },
+      { name: 'sushi', nameHe: 'סושימן', color: '#4ECDC4' },
+      { name: 'waiter', nameHe: 'מלצר', color: '#95B8D1' },
+      { name: 'dishwasher', nameHe: 'שוטף כלים', color: '#B8A9C9' },
+    ];
+    
+    const categoryMap = new Map<string, string>(); // name -> id
+    
+    for (const cat of standardCategories) {
+      // Upsert to handle both empty DB and existing categories
+      const category = await this.prisma.jobCategory.upsert({
+        where: {
+          organizationId_name: {
+            organizationId,
+            name: cat.name,
+          },
+        },
+        update: {
+          nameHe: cat.nameHe,
+          color: cat.color,
+        },
+        create: {
+          organizationId,
+          name: cat.name,
+          nameHe: cat.nameHe,
+          color: cat.color,
+        },
+      });
+      
+      categoryMap.set(cat.name, category.id);
+      console.log(`[JobCategories] ✅ ${cat.nameHe} (${cat.name}) → ${category.id}`);
+    }
+    
+    console.log(`[JobCategories] Initialized ${categoryMap.size} categories`);
+    return categoryMap;
+  }
+
+  /**
    * Parse an Excel file and return a preview of the data
    */
   async parseAndPreview(
@@ -149,6 +195,10 @@ export class HoursImportService {
       throw new BadRequestException('Import session expired or not found. Please upload the file again.');
     }
 
+    // CRITICAL: Initialize job categories FIRST (user resets DB with each upload)
+    console.log(`[Import] Starting import for ${monthYear || session.monthYear}`);
+    const categoryMap = await this.ensureJobCategories(organizationId);
+
     // Use monthYear from apply call or fall back to session
     const effectiveMonthYear = monthYear || session.monthYear;
 
@@ -166,7 +216,7 @@ export class HoursImportService {
     const defaultWage = (settings as any)?.defaultHourlyWage ?? 30;
     const defaultWages: { [key: string]: number } = (settings as any)?.defaultWages || {};
 
-    // Fetch job categories for auto-assignment
+    // Job categories already initialized via ensureJobCategories()
     const jobCategories = await this.prisma.jobCategory.findMany({
       where: { organizationId, isActive: true },
     });
@@ -203,6 +253,7 @@ export class HoursImportService {
           worker.category,
           jobCategories,
           createdNames,
+          categoryMap, // NEW: Pass pre-initialized categories
         );
         newlyCreatedUsers.push({ id: newUser.id, name: worker.name });
 
@@ -272,6 +323,7 @@ export class HoursImportService {
     category: string,
     jobCategories: any[],
     createdNames: Map<string, number>,
+    categoryMap: Map<string, string>, // NEW: Pre-initialized category IDs
   ) {
     // Split name into first/last - for single names, use it as firstName with empty lastName
     const nameParts = name.trim().split(/\s+/);
@@ -306,6 +358,7 @@ export class HoursImportService {
     const passwordHash = await bcrypt.hash(tempPassword, 10);
 
     // Auto-assign job category based on department from Excel
+    // NOW USES PRE-INITIALIZED CATEGORIES from categoryMap (guaranteed to exist!)
     let jobCategoryId: string | null = null;
     let isTipBased = false;
     const categoryLower = (category || '').trim();
@@ -316,16 +369,15 @@ export class HoursImportService {
       const mapping = DEPARTMENT_TO_CATEGORY[categoryLower];
       if (mapping) {
         console.log(`[CreateWorker] Found mapping: ${categoryLower} → ${mapping.category} (tipBased: ${mapping.isTipBased})`);
-        // Find matching job category in the org
-        const matchedCategory = jobCategories.find(
-          jc => jc.name === mapping.category || jc.nameHe === categoryLower
-        );
-        if (matchedCategory) {
-          jobCategoryId = matchedCategory.id;
-          console.log(`[CreateWorker] ✅ Assigned job category: ${matchedCategory.nameHe || matchedCategory.name} (${matchedCategory.id})`);
+        
+        // Use pre-initialized category from categoryMap (guaranteed to exist!)
+        if (categoryMap.has(mapping.category)) {
+          jobCategoryId = categoryMap.get(mapping.category)!;
+          console.log(`[CreateWorker] ✅ Assigned category: ${mapping.category} (${jobCategoryId}) from categoryMap`);
         } else {
-          console.log(`[CreateWorker] ⚠️ No job category found for ${mapping.category}`);
+          console.log(`[CreateWorker] ⚠️ Category ${mapping.category} not in categoryMap (should never happen!)`);
         }
+        
         isTipBased = mapping.isTipBased;
       } else {
         console.log(`[CreateWorker] No mapping found for "${categoryLower}", trying direct match`);
