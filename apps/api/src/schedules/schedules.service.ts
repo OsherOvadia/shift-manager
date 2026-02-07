@@ -42,6 +42,7 @@ export class SchedulesService {
         shiftAssignments: {
           select: {
             id: true,
+            userId: true, // CRITICAL: needed for kitchen staff table matching
             shiftDate: true,
             status: true,
             tipsEarned: true,
@@ -236,6 +237,7 @@ export class SchedulesService {
           },
           select: {
             id: true,
+            userId: true, // CRITICAL: needed for kitchen staff table matching
             shiftDate: true,
             status: true,
             tipsEarned: true,
