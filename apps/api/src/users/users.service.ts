@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -168,8 +169,21 @@ export class UsersService {
     if (updateUserDto.jobCategoryId !== undefined) updateData.jobCategoryId = updateUserDto.jobCategoryId;
     if (updateUserDto.hourlyWage !== undefined) updateData.hourlyWage = updateUserDto.hourlyWage;
 
-    // Employees can only update their own non-sensitive fields
+    // Email and password can be updated by admins/managers
     if (requesterRole !== 'EMPLOYEE') {
+      if (updateUserDto.email !== undefined) {
+        // Check if email is already taken by another user
+        const existingUser = await this.prisma.user.findUnique({
+          where: { email: updateUserDto.email },
+        });
+        if (existingUser && existingUser.id !== id) {
+          throw new BadRequestException('כתובת האימייל כבר בשימוש');
+        }
+        updateData.email = updateUserDto.email;
+      }
+      if (updateUserDto.password !== undefined) {
+        updateData.passwordHash = await bcrypt.hash(updateUserDto.password, 10);
+      }
       if (updateUserDto.role !== undefined) updateData.role = updateUserDto.role as any;
       if (updateUserDto.employmentType !== undefined) updateData.employmentType = updateUserDto.employmentType as any;
       if (updateUserDto.isActive !== undefined) updateData.isActive = updateUserDto.isActive;

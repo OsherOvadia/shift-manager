@@ -52,7 +52,7 @@ export class HoursImportController {
   )
   async uploadExcel(
     @UploadedFile() file: Express.Multer.File,
-    @Body('weekStartDate') weekStartDate: string,
+    @Body('monthYear') monthYear: string,
     @Request() req: any,
   ) {
     if (!file) {
@@ -64,7 +64,7 @@ export class HoursImportController {
       file.originalname,
       req.user.organizationId,
       undefined,
-      weekStartDate,
+      monthYear,
     );
   }
 
@@ -118,14 +118,14 @@ export class HoursImportController {
   @Post('apply/:sessionId')
   async applyImport(
     @Param('sessionId') sessionId: string,
-    @Body() body: { workerMapping: { [excelName: string]: string }; weekStartDate?: string },
+    @Body() body: { workerMapping: { [excelName: string]: string }; monthYear?: string },
     @Request() req: any,
   ) {
     return this.hoursImportService.applyImport(
       sessionId,
       req.user.organizationId,
       body.workerMapping || {},
-      body.weekStartDate,
+      body.monthYear,
       req.user.id,
     );
   }

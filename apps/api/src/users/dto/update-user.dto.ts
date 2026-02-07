@@ -1,4 +1,4 @@
-import { IsString, IsIn, IsBoolean, IsOptional, MinLength, MaxLength, IsUUID, IsNumber, Min } from 'class-validator';
+import { IsString, IsEmail, IsIn, IsBoolean, IsOptional, MinLength, MaxLength, IsUUID, IsNumber, Min } from 'class-validator';
 
 export class UpdateUserDto {
   @IsString()
@@ -8,10 +8,18 @@ export class UpdateUserDto {
   firstName?: string;
 
   @IsString()
-  @MinLength(2)
   @MaxLength(50)
   @IsOptional()
   lastName?: string;
+
+  @IsEmail()
+  @IsOptional()
+  email?: string;
+
+  @IsString()
+  @MinLength(6)
+  @IsOptional()
+  password?: string;
 
   @IsIn(['ADMIN', 'MANAGER', 'EMPLOYEE'])
   @IsOptional()

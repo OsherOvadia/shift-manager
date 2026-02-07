@@ -86,15 +86,16 @@ const CATEGORY_LABELS: { [key: string]: { label: string; color: string } } = {
   'שוטף כלים': { label: 'שוטף כלים', color: 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300' },
 }
 
-/**
- * Get the Sunday (start of week) for a given date.
- * The Israeli work week starts on Sunday.
- */
-function getWeekStartDate(date: Date): string {
-  const d = new Date(date)
-  const day = d.getDay() // 0=Sunday
-  d.setDate(d.getDate() - day)
-  return d.toISOString().split('T')[0]
+/** Hebrew month names */
+const HEBREW_MONTHS = [
+  'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+  'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר',
+]
+
+/** Get current month as YYYY-MM */
+function getCurrentMonthYear(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 }
 
 export default function ImportHoursPage() {
@@ -109,7 +110,7 @@ export default function ImportHoursPage() {
   const [workerMapping, setWorkerMapping] = useState<{ [name: string]: string }>({})
   const [expandedWorkers, setExpandedWorkers] = useState<Set<string>>(new Set())
   const [applyResult, setApplyResult] = useState<any>(null)
-  const [weekStartDate, setWeekStartDate] = useState<string>(getWeekStartDate(new Date()))
+  const [monthYear, setMonthYear] = useState<string>(getCurrentMonthYear())
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   // Fetch employees list for manual matching
@@ -124,7 +125,7 @@ export default function ImportHoursPage() {
     mutationFn: async (file: File) => {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('weekStartDate', weekStartDate)
+      formData.append('monthYear', monthYear)
       return api.upload<ImportPreview>('/hours-import/upload', formData, accessToken!)
     },
     onSuccess: (data) => {
@@ -158,7 +159,7 @@ export default function ImportHoursPage() {
       if (!preview) throw new Error('No preview data')
       return api.post(
         `/hours-import/apply/${preview.sessionId}`,
-        { workerMapping, weekStartDate },
+        { workerMapping, monthYear },
         accessToken!,
       )
     },
@@ -268,29 +269,12 @@ export default function ImportHoursPage() {
   const totalWorkers = preview?.summary.totalWorkers || 0
   const unmappedCount = totalWorkers - mappedCount
 
-  // Format the week date for display
-  const weekDisplayDate = useMemo(() => {
-    if (!weekStartDate) return ''
-    const start = new Date(weekStartDate)
-    const end = new Date(start)
-    end.setDate(end.getDate() + 6)
-    const fmt = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}`
-    return `${fmt(start)} - ${fmt(end)}`
-  }, [weekStartDate])
-
-  // Hebrew day letter to actual date mapping for display
-  const dayToDate = useMemo(() => {
-    if (!weekStartDate) return {}
-    const map: { [key: string]: string } = {}
-    const days = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש']
-    const start = new Date(weekStartDate)
-    days.forEach((day, idx) => {
-      const d = new Date(start)
-      d.setDate(d.getDate() + idx)
-      map[day] = `${d.getDate()}/${d.getMonth() + 1}`
-    })
-    return map
-  }, [weekStartDate])
+  // Format month display
+  const monthDisplayLabel = useMemo(() => {
+    if (!monthYear) return ''
+    const [y, m] = monthYear.split('-').map(Number)
+    return `${HEBREW_MONTHS[m - 1]} ${y}`
+  }, [monthYear])
 
   return (
     <PageTransition>
@@ -343,40 +327,34 @@ export default function ImportHoursPage() {
         {/* ==================== STEP 1: UPLOAD ==================== */}
         {step === 'upload' && (
           <FadeIn>
-            {/* Week date picker */}
+            {/* Month picker */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-primary" />
-                  לאיזה שבוע מתייחס הקובץ?
+                  לאיזה חודש מתייחס הקובץ?
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                   <div className="flex items-center gap-2 flex-1">
-                    <Label htmlFor="weekStart" className="whitespace-nowrap text-sm">תחילת שבוע (יום ראשון):</Label>
+                    <Label htmlFor="monthPicker" className="whitespace-nowrap text-sm">חודש:</Label>
                     <Input
-                      id="weekStart"
-                      type="date"
-                      value={weekStartDate}
-                      onChange={(e) => {
-                        // Snap to the nearest Sunday
-                        const d = new Date(e.target.value)
-                        if (!isNaN(d.getTime())) {
-                          setWeekStartDate(getWeekStartDate(d))
-                        }
-                      }}
+                      id="monthPicker"
+                      type="month"
+                      value={monthYear}
+                      onChange={(e) => setMonthYear(e.target.value)}
                       className="max-w-[200px]"
                     />
                   </div>
-                  {weekStartDate && (
+                  {monthYear && (
                     <Badge variant="secondary" className="text-sm">
-                      שבוע: {weekDisplayDate}
+                      {monthDisplayLabel}
                     </Badge>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  התאריך ישמש להמרת ימים (א&apos;-ש&apos;) לתאריכים בפועל ולשיוך המשמרות ללוח
+                  הנתונים מהקובץ ידרסו משמרות קיימות בחודש זה וישויכו ללוח המשמרות
                 </p>
               </CardContent>
             </Card>
@@ -457,14 +435,14 @@ export default function ImportHoursPage() {
         {/* ==================== STEP 2: PREVIEW ==================== */}
         {step === 'preview' && preview && (
           <FadeIn>
-            {/* Week info banner */}
-            {weekStartDate && (
+            {/* Month info banner */}
+            {monthYear && (
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="p-3 flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">שבוע: {weekDisplayDate}</span>
+                  <span className="text-sm font-medium">חודש: {monthDisplayLabel}</span>
                   <span className="text-xs text-muted-foreground">
-                    (המשמרות יירשמו ללוח בתאריכים אלו)
+                    (המשמרות יירשמו ללוח וידרסו נתונים קיימים)
                   </span>
                 </CardContent>
               </Card>
@@ -640,9 +618,6 @@ export default function ImportHoursPage() {
                                 >
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium">יום {shift.day}&apos;</span>
-                                    {dayToDate[shift.day] && (
-                                      <span className="text-xs text-muted-foreground">({dayToDate[shift.day]})</span>
-                                    )}
                                     {shift.startTime && shift.endTime && (
                                       <span className="text-muted-foreground">
                                         {shift.startTime}-{shift.endTime}

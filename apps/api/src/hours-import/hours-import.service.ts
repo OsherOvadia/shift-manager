@@ -42,7 +42,7 @@ export interface ImportPreview {
 }
 
 // In-memory store for import sessions (simple approach, no Redis needed)
-const importSessions = new Map<string, { preview: ImportPreview; parsedData: ParsedWorker[]; timestamp: number; weekStartDate?: string }>();
+const importSessions = new Map<string, { preview: ImportPreview; parsedData: ParsedWorker[]; timestamp: number; monthYear?: string }>();
 
 // Clean up old sessions (older than 30 minutes)
 function cleanOldSessions() {
@@ -89,7 +89,7 @@ export class HoursImportService {
     fileName: string,
     organizationId: string,
     workerOverrides?: { [excelName: string]: string },
-    weekStartDate?: string,
+    monthYear?: string,
   ): Promise<ImportPreview> {
     cleanOldSessions();
 
@@ -122,7 +122,7 @@ export class HoursImportService {
       preview,
       parsedData: parsedWorkers,
       timestamp: Date.now(),
-      weekStartDate,
+      monthYear,
     });
 
     return preview;
@@ -137,7 +137,7 @@ export class HoursImportService {
     sessionId: string,
     organizationId: string,
     workerMapping: { [excelName: string]: string },
-    weekStartDate?: string,
+    monthYear?: string,
     adminUserId?: string,
   ) {
     const session = importSessions.get(sessionId);
@@ -145,8 +145,8 @@ export class HoursImportService {
       throw new BadRequestException('Import session expired or not found. Please upload the file again.');
     }
 
-    // Use weekStartDate from apply call or fall back to session
-    const effectiveWeekStart = weekStartDate || session.weekStartDate;
+    // Use monthYear from apply call or fall back to session
+    const effectiveMonthYear = monthYear || session.monthYear;
 
     // Re-match with the user-supplied mapping
     const matchedWorkers = await this.matchWorkers(
@@ -213,13 +213,13 @@ export class HoursImportService {
       }
     }
 
-    // Create actual shift assignments if we have a week start date
+    // Create actual shift assignments if we have a month/year
     let assignmentsCreated = 0;
-    if (effectiveWeekStart) {
-      assignmentsCreated = await this.createShiftAssignments(
+    if (effectiveMonthYear) {
+      assignmentsCreated = await this.createMonthlyShiftAssignments(
         matchedWorkers,
         organizationId,
-        effectiveWeekStart,
+        effectiveMonthYear,
         adminUserId,
       );
     }
@@ -342,54 +342,76 @@ export class HoursImportService {
   }
 
   /**
-   * Create actual ShiftAssignment records from imported Excel data.
-   * This makes the data appear in financial reports and the schedule board.
+   * Create actual ShiftAssignment records from imported Excel data for a full month.
+   * Distributes shifts across weeks based on day letter sequence.
+   * OVERWRITES existing shift data for these workers in this month.
    */
-  private async createShiftAssignments(
+  private async createMonthlyShiftAssignments(
     workers: MatchedWorker[],
     organizationId: string,
-    weekStartDateStr: string,
+    monthYearStr: string, // "YYYY-MM" format
     adminUserId?: string,
   ): Promise<number> {
-    const weekStartDate = new Date(weekStartDateStr);
-    if (isNaN(weekStartDate.getTime())) {
+    const [yearStr, monthStr] = monthYearStr.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10); // 1-12
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
       return 0;
     }
 
-    // Normalize to midnight UTC
-    weekStartDate.setUTCHours(0, 0, 0, 0);
+    // Calculate first and last day of the month
+    const monthStart = new Date(Date.UTC(year, month - 1, 1));
+    const monthEnd = new Date(Date.UTC(year, month, 0)); // Last day of month
 
-    // Find or create a WeeklySchedule for this week
-    let schedule = await this.prisma.weeklySchedule.findUnique({
-      where: {
-        organizationId_weekStartDate: {
-          organizationId,
-          weekStartDate,
-        },
-      },
-    });
+    // Find all Sundays in this month (week start dates)
+    const weekStartDates: Date[] = [];
+    const d = new Date(monthStart);
+    // Go back to the Sunday at or before monthStart
+    while (d.getUTCDay() !== 0) {
+      d.setUTCDate(d.getUTCDate() - 1);
+    }
+    // Collect all Sundays that overlap with this month
+    while (d <= monthEnd) {
+      weekStartDates.push(new Date(d));
+      d.setUTCDate(d.getUTCDate() + 7);
+    }
 
-    if (!schedule) {
-      // Need a createdById - use the admin user or first admin in org
-      let creatorId = adminUserId;
-      if (!creatorId) {
-        const admin = await this.prisma.user.findFirst({
-          where: { organizationId, role: { in: ['ADMIN', 'MANAGER'] as any } },
-          select: { id: true },
-        });
-        creatorId = admin?.id;
-      }
-      if (!creatorId) return 0;
+    if (weekStartDates.length === 0) return 0;
 
-      schedule = await this.prisma.weeklySchedule.create({
-        data: {
-          organizationId,
-          weekStartDate,
-          status: 'PUBLISHED' as any,
-          createdById: creatorId,
-          publishedAt: new Date(),
+    // Get or find a creator for schedules
+    let creatorId = adminUserId;
+    if (!creatorId) {
+      const admin = await this.prisma.user.findFirst({
+        where: { organizationId, role: { in: ['ADMIN', 'MANAGER'] as any } },
+        select: { id: true },
+      });
+      creatorId = admin?.id;
+    }
+    if (!creatorId) return 0;
+
+    // Find or create WeeklySchedules for each week in the month
+    const scheduleMap = new Map<string, any>(); // weekStartDate ISO -> schedule
+    for (const wsd of weekStartDates) {
+      let schedule = await this.prisma.weeklySchedule.findUnique({
+        where: {
+          organizationId_weekStartDate: {
+            organizationId,
+            weekStartDate: wsd,
+          },
         },
       });
+      if (!schedule) {
+        schedule = await this.prisma.weeklySchedule.create({
+          data: {
+            organizationId,
+            weekStartDate: wsd,
+            status: 'PUBLISHED' as any,
+            createdById: creatorId,
+            publishedAt: new Date(),
+          },
+        });
+      }
+      scheduleMap.set(wsd.toISOString(), schedule);
     }
 
     // Get shift templates for time matching
@@ -397,58 +419,93 @@ export class HoursImportService {
       where: { organizationId, isActive: true },
       orderBy: { startTime: 'asc' },
     });
-
     if (templates.length === 0) return 0;
 
+    // Delete existing shift assignments for these workers in this month (overwrite)
+    const userIds = workers
+      .filter(w => w.matchedUserId)
+      .map(w => w.matchedUserId as string);
+
+    if (userIds.length > 0) {
+      const scheduleIds = Array.from(scheduleMap.values()).map((s: any) => s.id);
+      await this.prisma.shiftAssignment.deleteMany({
+        where: {
+          scheduleId: { in: scheduleIds },
+          userId: { in: userIds },
+          shiftDate: {
+            gte: monthStart,
+            lte: monthEnd,
+          },
+        },
+      });
+    }
+
+    // Build a map of day letter occurrences for each worker
+    // For monthly data, shifts with the same day letter are in chronological order
+    // First א = first Sunday of month, second א = second Sunday, etc.
     let assignmentsCreated = 0;
 
     for (const worker of workers) {
       if (!worker.matchedUserId) continue;
 
+      // Group shifts by day letter, preserving order
+      const dayOccurrences = new Map<string, ParsedShift[]>();
       for (const shift of worker.shifts) {
-        const dayOffset = HEBREW_DAY_MAP[shift.day];
+        const existing = dayOccurrences.get(shift.day) || [];
+        existing.push(shift);
+        dayOccurrences.set(shift.day, existing);
+      }
+
+      // For each day letter, distribute across weeks
+      for (const [dayLetter, shifts] of dayOccurrences) {
+        const dayOffset = HEBREW_DAY_MAP[dayLetter];
         if (dayOffset === undefined) continue;
 
-        // Calculate the actual date for this shift
-        const shiftDate = new Date(weekStartDate);
-        shiftDate.setUTCDate(shiftDate.getUTCDate() + dayOffset);
+        // Calculate all dates for this day-of-week in the month
+        const datesForDay: Date[] = [];
+        for (const wsd of weekStartDates) {
+          const date = new Date(wsd);
+          date.setUTCDate(date.getUTCDate() + dayOffset);
+          // Only include if within the month
+          if (date >= monthStart && date <= monthEnd) {
+            datesForDay.push(date);
+          }
+        }
 
-        // Match to a shift template based on start time
-        const template = this.findBestTemplate(templates, shift.startTime);
-        if (!template) continue;
+        // Assign each shift occurrence to the corresponding date
+        for (let i = 0; i < shifts.length && i < datesForDay.length; i++) {
+          const shift = shifts[i];
+          const shiftDate = datesForDay[i];
 
-        try {
-          // Upsert - create or update the assignment
-          await this.prisma.shiftAssignment.upsert({
-            where: {
-              scheduleId_userId_shiftDate_shiftTemplateId: {
+          // Find which week this date belongs to
+          const weekSunday = new Date(shiftDate);
+          while (weekSunday.getUTCDay() !== 0) {
+            weekSunday.setUTCDate(weekSunday.getUTCDate() - 1);
+          }
+          const schedule = scheduleMap.get(weekSunday.toISOString());
+          if (!schedule) continue;
+
+          const template = this.findBestTemplate(templates, shift.startTime);
+          if (!template) continue;
+
+          try {
+            await this.prisma.shiftAssignment.create({
+              data: {
                 scheduleId: schedule.id,
-                userId: worker.matchedUserId,
-                shiftDate,
+                userId: worker.matchedUserId!,
                 shiftTemplateId: template.id,
+                shiftDate,
+                actualStartTime: shift.startTime,
+                actualEndTime: shift.endTime,
+                actualHours: shift.totalHours,
+                status: 'CONFIRMED' as any,
               },
-            },
-            update: {
-              actualStartTime: shift.startTime,
-              actualEndTime: shift.endTime,
-              actualHours: shift.totalHours,
-              status: 'CONFIRMED' as any,
-            },
-            create: {
-              scheduleId: schedule.id,
-              userId: worker.matchedUserId,
-              shiftTemplateId: template.id,
-              shiftDate,
-              actualStartTime: shift.startTime,
-              actualEndTime: shift.endTime,
-              actualHours: shift.totalHours,
-              status: 'CONFIRMED' as any,
-            },
-          });
-          assignmentsCreated++;
-        } catch (err) {
-          // Log but don't fail the entire import for one assignment
-          console.error(`Failed to create assignment for ${worker.name} on day ${shift.day}:`, err);
+            });
+            assignmentsCreated++;
+          } catch (err) {
+            // May fail on unique constraint if data is weird - log and continue
+            console.error(`Failed to create assignment for ${worker.name} on ${shiftDate.toISOString()}:`, err);
+          }
         }
       }
     }

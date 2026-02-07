@@ -140,6 +140,9 @@ export default function EmployeesPage() {
       hourlyWage: employee.hourlyWage?.toString() || '',
       baseHourlyWage: employee.baseHourlyWage?.toString() || '',
       isTipBased: employee.isTipBased || false,
+      email: employee.email || '',
+      _originalEmail: employee.email || '',
+      newPassword: '',
     })
     setIsEditDialogOpen(true)
   }
@@ -154,6 +157,16 @@ export default function EmployeesPage() {
 
     if (editingEmployee.isTipBased && editingEmployee.baseHourlyWage) {
       updateData.baseHourlyWage = parseFloat(editingEmployee.baseHourlyWage)
+    }
+
+    // Include email if changed
+    if (editingEmployee.email && editingEmployee.email !== editingEmployee._originalEmail) {
+      updateData.email = editingEmployee.email
+    }
+
+    // Include password if provided
+    if (editingEmployee.newPassword && editingEmployee.newPassword.length >= 6) {
+      updateData.password = editingEmployee.newPassword
     }
 
     updateMutation.mutate({
@@ -436,7 +449,32 @@ export default function EmployeesPage() {
                 <Label className="font-medium">
                   {editingEmployee.firstName} {editingEmployee.lastName}
                 </Label>
-                <p className="text-sm text-muted-foreground">{editingEmployee.email}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="editEmail">אימייל</Label>
+                <Input
+                  id="editEmail"
+                  type="email"
+                  value={editingEmployee.email}
+                  onChange={(e) =>
+                    setEditingEmployee({ ...editingEmployee, email: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="editPassword">סיסמה חדשה</Label>
+                <Input
+                  id="editPassword"
+                  type="password"
+                  placeholder="השאר ריק לשמור על הסיסמה הנוכחית"
+                  value={editingEmployee.newPassword}
+                  onChange={(e) =>
+                    setEditingEmployee({ ...editingEmployee, newPassword: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">מינימום 6 תווים. השאר ריק אם אין צורך לשנות.</p>
               </div>
 
               <div className="space-y-2">
