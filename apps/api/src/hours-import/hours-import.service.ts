@@ -661,6 +661,7 @@ export class HoursImportService {
     const workers: ParsedWorker[] = [];
     let currentWorkerName: string | null = null;
     let currentWorkerCategory: string = '';
+    let pendingCategory: string = ''; // Category found before worker name (מחלקה row comes before שם עובד)
     let currentShifts: ParsedShift[] = [];
     let totalHours = 0;
     let hours100 = 0;
@@ -677,6 +678,42 @@ export class HoursImportService {
 
       // Convert row to strings for easier matching
       const rowStr = row.map(cell => String(cell || '').trim());
+
+      // Check for "מחלקה:" (department) header row - this often appears BEFORE "שם עובד:"
+      const deptIdx = rowStr.findIndex(cell =>
+        cell.includes('מחלקה:') || cell.includes('מחלקה')
+      );
+      if (deptIdx !== -1) {
+        // Extract department value from this row
+        for (const cell of rowStr) {
+          const trimmed = cell.trim();
+          // Check if the cell itself is a known department keyword
+          if (knownDepartments.has(trimmed)) {
+            pendingCategory = trimmed;
+            break;
+          }
+          // Check if the value is after ":" in the same cell (e.g. "מחלקה: טבח")
+          if (trimmed.includes('מחלקה') && trimmed.includes(':')) {
+            const afterColon = trimmed.split(':').pop()?.trim() || '';
+            if (afterColon && knownDepartments.has(afterColon)) {
+              pendingCategory = afterColon;
+              break;
+            }
+          }
+        }
+        // Also check adjacent cells for the department value
+        if (!pendingCategory) {
+          for (let i = 0; i < rowStr.length; i++) {
+            if (i === deptIdx) continue;
+            const trimmed = rowStr[i].trim();
+            if (trimmed && knownDepartments.has(trimmed)) {
+              pendingCategory = trimmed;
+              break;
+            }
+          }
+        }
+        // Don't continue here - the row might also contain other info
+      }
 
       // Check if this is a "שם עובד:" (worker name) header row
       const workerNameIdx = rowStr.findIndex(cell =>
@@ -720,7 +757,9 @@ export class HoursImportService {
         }
 
         currentWorkerName = name || null;
-        currentWorkerCategory = '';
+        // Use the pending category (from מחלקה row that appeared before this שם עובד row)
+        currentWorkerCategory = pendingCategory || '';
+        pendingCategory = ''; // Reset pending for next worker
         currentShifts = [];
         totalHours = 0;
         hours100 = 0;
