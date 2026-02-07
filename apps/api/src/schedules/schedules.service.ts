@@ -48,6 +48,9 @@ export class SchedulesService {
             sittingTips: true,
             takeawayTips: true,
             deliveryTips: true,
+            actualStartTime: true,
+            actualEndTime: true,
+            actualHours: true,
             user: {
               select: {
                 id: true,
