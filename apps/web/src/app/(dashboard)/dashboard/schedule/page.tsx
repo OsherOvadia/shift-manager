@@ -111,7 +111,7 @@ export default function SchedulePage() {
     const dateStr = date.toISOString().split('T')[0]
     
     // Filter to exclude kitchen staff (they appear in separate table)
-    const kitchenCategories = ['cook', 'טבח', 'chef', 'sushiman', 'סושימן', 'sushi', 'kitchen', 'מטבח']
+    const kitchenCategories = ['cook', 'טבח', 'chef', 'sushi', 'סוש', 'kitchen', 'מטבח', 'dishwash', 'כלים']
     
     return scheduleDetails.shiftAssignments.filter((a: any) => {
       const assignmentDate = new Date(a.shiftDate).toISOString().split('T')[0]

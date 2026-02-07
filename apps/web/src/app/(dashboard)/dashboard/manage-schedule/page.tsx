@@ -331,6 +331,14 @@ export default function ManageSchedulePage() {
         categoryName.includes(kitchen) || categoryNameHe.includes(kitchen)
       )
       
+      // Debug: Log all assignments to see what's being filtered
+      console.log(`[AssignmentFilter] ${a.user.firstName}:`, {
+        categoryName,
+        categoryNameHe,
+        isKitchen,
+        willShow: !isKitchen
+      })
+      
       return !isKitchen // Only show non-kitchen staff in main table
     })
   }
@@ -431,7 +439,8 @@ export default function ManageSchedulePage() {
   }
 
   // Get kitchen staff (cooks, sushi, dishwashers)
-  const kitchenCategories = ['cook', 'טבח', 'chef', 'sushiman', 'סושימן', 'sushi', 'kitchen', 'מטבח']
+  // IMPORTANT: Check BOTH name and nameHe fields, and use includes() for partial matches
+  const kitchenCategories = ['cook', 'טבח', 'chef', 'sushi', 'סוש', 'kitchen', 'מטבח', 'dishwash', 'כלים']
   
   const kitchenStaff = useMemo(() => {
     if (!employees) return []
