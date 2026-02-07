@@ -310,26 +310,38 @@ export class HoursImportService {
     let isTipBased = false;
     const categoryLower = (category || '').trim();
 
+    console.log(`[CreateWorker] Worker: ${name}, Excel Category: "${categoryLower}"`);
+
     if (categoryLower) {
       const mapping = DEPARTMENT_TO_CATEGORY[categoryLower];
       if (mapping) {
+        console.log(`[CreateWorker] Found mapping: ${categoryLower} → ${mapping.category} (tipBased: ${mapping.isTipBased})`);
         // Find matching job category in the org
         const matchedCategory = jobCategories.find(
           jc => jc.name === mapping.category || jc.nameHe === categoryLower
         );
         if (matchedCategory) {
           jobCategoryId = matchedCategory.id;
+          console.log(`[CreateWorker] ✅ Assigned job category: ${matchedCategory.nameHe || matchedCategory.name} (${matchedCategory.id})`);
+        } else {
+          console.log(`[CreateWorker] ⚠️ No job category found for ${mapping.category}`);
         }
         isTipBased = mapping.isTipBased;
       } else {
+        console.log(`[CreateWorker] No mapping found for "${categoryLower}", trying direct match`);
         // Try to match by nameHe directly
         const matchedCategory = jobCategories.find(
           jc => jc.nameHe === categoryLower
         );
         if (matchedCategory) {
           jobCategoryId = matchedCategory.id;
+          console.log(`[CreateWorker] ✅ Direct match job category: ${matchedCategory.nameHe || matchedCategory.name} (${matchedCategory.id})`);
+        } else {
+          console.log(`[CreateWorker] ⚠️ No direct match found for "${categoryLower}"`);
         }
       }
+    } else {
+      console.log(`[CreateWorker] ⚠️ No category provided for ${name}`);
     }
 
     // Determine the wage: use per-category wage if available, otherwise the general default
@@ -338,7 +350,12 @@ export class HoursImportService {
       const mapping = DEPARTMENT_TO_CATEGORY[categoryLower];
       if (mapping && defaultWages[mapping.category] !== undefined) {
         wage = defaultWages[mapping.category];
+        console.log(`[CreateWorker] Using category-specific wage: ${wage} for ${mapping.category}`);
+      } else {
+        console.log(`[CreateWorker] Using default wage: ${wage}`);
       }
+    } else {
+      console.log(`[CreateWorker] Using default wage: ${wage} (no category)`);
     }
 
     const userData: any = {
@@ -710,8 +727,11 @@ export class HoursImportService {
    * Example: 17:00-22:00 midpoint=19:30 → evening
    */
   private findBestTemplate(templates: any[], startTime: string | null, endTime?: string | null): any {
+    console.log(`[Template] Available templates:`, templates.map(t => `${t.shiftType}(${t.startTime}-${t.endTime})`));
+    
     if (!startTime) {
       // No time info - return first template
+      console.log(`[Template] ⚠️ No start time, using first template: ${templates[0]?.shiftType}`);
       return templates[0] || null;
     }
 
@@ -731,18 +751,28 @@ export class HoursImportService {
     }
 
     const midpointHours = midpointMins / 60;
+    const midpointTime = `${Math.floor(midpointHours)}:${Math.round((midpointHours % 1) * 60).toString().padStart(2, '0')}`;
+    
+    console.log(`[Template] Shift: ${startTime}-${endTime || 'N/A'}, Midpoint: ${midpointTime} (${midpointHours.toFixed(2)}h)`);
 
     // If the midpoint of the shift is before 16:00 → morning shift
     // If the midpoint is 16:00 or later → evening shift
     if (midpointHours < 16) {
       const morning = templates.find(t => t.shiftType === 'MORNING');
-      if (morning) return morning;
+      if (morning) {
+        console.log(`[Template] ✅ Selected MORNING (midpoint < 16:00)`);
+        return morning;
+      }
     } else {
       const evening = templates.find(t => t.shiftType === 'EVENING' || t.shiftType === 'EVENING_CLOSE');
-      if (evening) return evening;
+      if (evening) {
+        console.log(`[Template] ✅ Selected EVENING (midpoint >= 16:00)`);
+        return evening;
+      }
     }
 
     // Fallback: match closest start time
+    console.log(`[Template] ⚠️ No matching shift type found, using fallback (closest start time)`);
     let bestTemplate = templates[0];
     let bestDiff = Infinity;
 
@@ -758,6 +788,7 @@ export class HoursImportService {
       }
     }
 
+    console.log(`[Template] ✅ Selected ${bestTemplate.shiftType} by closest start time (diff: ${bestDiff} minutes)`);
     return bestTemplate;
   }
 
@@ -1147,9 +1178,27 @@ export class HoursImportService {
     const numberValues: number[] = [];
     const durationValues: number[] = []; // For H:MM format hours (like 5:58 = 5.97h)
 
+    console.log(`[TimeExtract] Day ${day}, Raw cells:`, row.map((c, i) => `[${i}]="${c}"`).join(', '));
+
     for (const cell of row) {
       const trimmed = String(cell).trim();
       if (!trimmed || trimmed === '0') continue;
+
+      // Check for Excel serial number (times stored as decimal fractions of a day)
+      // Example: 0.479166667 = 11:30, 0.708333333 = 17:00
+      const num = parseFloat(trimmed);
+      if (!isNaN(num) && num > 0 && num < 1 && !trimmed.includes(':')) {
+        // This is likely an Excel time serial number
+        const totalMinutes = Math.round(num * 24 * 60);
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        if (h >= 6 && h <= 23) {
+          const timeStr = `${h}:${m.toString().padStart(2, '0')}`;
+          timeValues.push(timeStr);
+          console.log(`[TimeExtract] Converted Excel serial ${num} → ${timeStr}`);
+          continue;
+        }
+      }
 
       // Check for time pattern HH:MM or H:MM
       if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
@@ -1160,20 +1209,26 @@ export class HoursImportService {
           // Duration hours (total worked) are typically < 15 hours
           if (h >= 6 && h <= 23) {
             timeValues.push(trimmed); // Likely a clock time (entry/exit)
+            console.log(`[TimeExtract] Found clock time: ${trimmed}`);
           }
           // If it looks like duration (under 15 hours), also track as duration
           if (hoursValue > 0 && hoursValue < 15) {
             durationValues.push(hoursValue);
+            console.log(`[TimeExtract] Found duration: ${trimmed} (${hoursValue.toFixed(2)}h)`);
           }
         }
       }
 
       // Check for decimal hours (like 5.36, 6.26)
-      const num = parseFloat(trimmed);
       if (!isNaN(num) && num > 0 && num < 24 && trimmed.includes('.')) {
         numberValues.push(num);
+        console.log(`[TimeExtract] Found decimal hours: ${num}`);
       }
     }
+
+    console.log(`[TimeExtract] All times found:`, timeValues);
+    console.log(`[TimeExtract] All decimal hours:`, numberValues);
+    console.log(`[TimeExtract] All durations:`, durationValues);
 
     // Separate clock times from duration values
     // Clock times: typically >= 6:00 (entry around 8-18, exit around 15-00)
@@ -1182,13 +1237,18 @@ export class HoursImportService {
     if (timeValues.length >= 2) {
       startTime = timeValues[timeValues.length - 1]; // Last = entry (כניסה)
       endTime = timeValues[timeValues.length - 2];   // Second to last = exit (יציאה)
+      console.log(`[TimeExtract] Assigned times: ${startTime} → ${endTime}`);
     } else if (timeValues.length === 1) {
       startTime = timeValues[0];
+      console.log(`[TimeExtract] Only one time found: ${startTime}`);
+    } else {
+      console.log(`[TimeExtract] ⚠️ No times found!`);
     }
 
     // Total hours - prefer decimal values (like 5.96), then duration H:MM values
     if (numberValues.length > 0) {
       totalHours = Math.max(...numberValues);
+      console.log(`[TimeExtract] Using decimal hours: ${totalHours}`);
     }
 
     // If no decimal number found, use the smallest duration value
@@ -1205,6 +1265,7 @@ export class HoursImportService {
         // Pick the first non-clock-time duration
         if (dur > 0 && dur < 15) {
           totalHours = dur;
+          console.log(`[TimeExtract] Using duration value: ${totalHours}`);
           break;
         }
       }
@@ -1217,16 +1278,22 @@ export class HoursImportService {
       let diff = (eh - sh) + (em - sm) / 60;
       if (diff < 0) diff += 24;
       totalHours = diff;
+      console.log(`[TimeExtract] Calculated hours from times: ${totalHours}`);
     }
 
-    if (totalHours === 0) return null;
+    if (totalHours === 0) {
+      console.log(`[TimeExtract] ❌ No hours found, returning null`);
+      return null;
+    }
 
-    return {
+    const result = {
       day,
       totalHours: Math.round(totalHours * 100) / 100,
       startTime,
       endTime,
     };
+    console.log(`[TimeExtract] ✅ Final shift:`, result);
+    return result;
   }
 
   // ==================== WORKER MATCHING ====================
