@@ -81,6 +81,11 @@ export default function SchedulePage() {
           category: a.user.jobCategory?.name,
         })),
       })
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/bbe505a0-ffe1-4fcf-8c1f-fb1a1a44ef4f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'schedule/page.tsx:75',message:'All assignment user IDs and categories',data:{allUserIds:data?.shiftAssignments?.map((a:any)=>({userId:a.userId,name:`${a.user.firstName} ${a.user.lastName}`,category:a.user.jobCategory?.name})),totalAssignments:data?.shiftAssignments?.length},timestamp:Date.now(),hypothesisId:'A,B'})}).catch(()=>{});
+      // #endregion
+      
       return data
     },
     enabled: !!currentSchedule?.id && !!accessToken,
@@ -125,6 +130,11 @@ export default function SchedulePage() {
     })
     
     console.log('[KitchenFilter] Found kitchen staff:', filtered.length, filtered.map((k: any) => k.firstName))
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/bbe505a0-ffe1-4fcf-8c1f-fb1a1a44ef4f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'schedule/page.tsx:106',message:'Kitchen staff identified from employees',data:{kitchenStaffIds:filtered.map((k:any)=>({userId:k.id,name:`${k.firstName} ${k.lastName}`,category:k.jobCategory?.name})),count:filtered.length},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    
     return filtered
   }, [employees])
 
@@ -133,6 +143,12 @@ export default function SchedulePage() {
       console.log('[KitchenAssignment] No shift assignments in scheduleDetails')
       return null
     }
+    
+    // #region agent log
+    if (date.getDate() === 4) {
+      fetch('http://127.0.0.1:7242/ingest/bbe505a0-ffe1-4fcf-8c1f-fb1a1a44ef4f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'schedule/page.tsx:124',message:'Kitchen assignment lookup',data:{searchingForUserId:userId,dateSearching:date.toISOString().split('T')[0],totalAssignmentsInSchedule:scheduleDetails.shiftAssignments.length,allUserIdsInAssignments:scheduleDetails.shiftAssignments.map((a:any)=>a.userId).slice(0,10)},timestamp:Date.now(),hypothesisId:'B,D'})}).catch(()=>{});
+    }
+    // #endregion
     
     const dateStr = date.toISOString().split('T')[0]
     const userAssignments = scheduleDetails.shiftAssignments.filter((a: any) => a.userId === userId)
