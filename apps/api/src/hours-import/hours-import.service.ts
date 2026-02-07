@@ -1177,144 +1177,72 @@ export class HoursImportService {
   }
 
   private extractShiftFromRow(row: string[], day: string): ParsedShift | null {
-    // Find hours and time values from the row
-    // Excel columns (RTL): שם | יום | שבת | הפסקה | 150% | 125% | 100% | סה"כ | יציאה | כניסה | תאריך
+    // CSV Column Structure (from raw_data.csv):
+    // תאריך,כניסה,יציאה,סה'כ,100%,125%,150%,שבת,הפסקה,יום,שם,עובד
+    // Col:  0     1      2      3   4    5     6    7     8       9    10   11
+    // 
+    // Column 1 = כניסה (entry time) - e.g., "17:49", "11:57"
+    // Column 2 = יציאה (exit time) - e.g., "23:29", "0:22" (past midnight!)
+    // Column 6 = 150% total hours (decimal like 5.66)
+    
     let totalHours = 0;
     let startTime: string | null = null;
     let endTime: string | null = null;
 
-    const timeValues: string[] = [];
-    const numberValues: number[] = [];
-    const durationValues: number[] = []; // For H:MM format hours (like 5:58 = 5.97h)
+    console.log(`[TimeExtract] Day ${day}`);
+    console.log(`[TimeExtract] Row[1] (Entry): "${row[1]}"`);
+    console.log(`[TimeExtract] Row[2] (Exit): "${row[2]}"`);
+    console.log(`[TimeExtract] Row[6] (Hours): "${row[6]}"`);
 
-    console.log(`[TimeExtract] Day ${day}, Raw cells:`, row.map((c, i) => `[${i}]="${c}" (type: ${typeof c})`).join(', '));
-
-    for (let i = 0; i < row.length; i++) {
-      const cell = row[i];
-      const trimmed = String(cell).trim();
-      if (!trimmed || trimmed === '0') continue;
-
-      console.log(`[TimeExtract] Cell[${i}]: "${trimmed}" (original type: ${typeof cell})`);
-
-      // Check for Excel serial number (times stored as decimal fractions of a day)
-      // Example: 0.479166667 = 11:30, 0.708333333 = 17:00
-      const num = parseFloat(trimmed);
-      if (!isNaN(num) && num > 0 && num < 1 && !trimmed.includes(':')) {
-        // This is likely an Excel time serial number
-        const totalMinutes = Math.round(num * 24 * 60);
-        const h = Math.floor(totalMinutes / 60);
-        const m = totalMinutes % 60;
-        const timeStr = `${h}:${m.toString().padStart(2, '0')}`;
-        timeValues.push(timeStr);
-        console.log(`[TimeExtract] ✅ Converted Excel serial ${num} → ${timeStr}`);
-        continue;
+    // DIRECT COLUMN PARSING - Column 1 = Entry, Column 2 = Exit
+    const entryCell = row[1]?.toString().trim();
+    const exitCell = row[2]?.toString().trim();
+    
+    // Parse entry time (accept all valid HH:MM format)
+    if (entryCell && /^\d{1,2}:\d{2}$/.test(entryCell)) {
+      const [h, m] = entryCell.split(':').map(Number);
+      if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+        startTime = entryCell;
+        console.log(`[TimeExtract] ✅ Entry time: ${startTime}`);
       }
-
-      // Check for time pattern HH:MM or H:MM (most common format)
-      if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
-        const [h, m] = trimmed.split(':').map(Number);
-        if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
-          const hoursValue = h + m / 60;
-          
-          // Always capture time values for potential entry/exit
-          timeValues.push(trimmed);
-          console.log(`[TimeExtract] ✅ Found time: ${trimmed} (${hoursValue.toFixed(2)}h)`);
-          
-          // If it looks like duration (under 15 hours), also track as duration
-          if (hoursValue > 0 && hoursValue < 15) {
-            durationValues.push(hoursValue);
-            console.log(`[TimeExtract] Also treating as duration`);
-          }
-        }
-      }
-
-      // Check for decimal hours (like 5.36, 6.26 for total hours worked)
-      if (!isNaN(num) && num >= 1 && num < 24 && trimmed.includes('.')) {
-        numberValues.push(num);
-        console.log(`[TimeExtract] ✅ Found decimal hours: ${num}`);
+    }
+    
+    // Parse exit time - CRITICAL: Accept 0:00-5:59 for past midnight exits!
+    if (exitCell && /^\d{1,2}:\d{2}$/.test(exitCell)) {
+      const [h, m] = exitCell.split(':').map(Number);
+      if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+        endTime = exitCell;
+        console.log(`[TimeExtract] ✅ Exit time: ${endTime}`);
       }
     }
 
-    console.log(`[TimeExtract] ===== SUMMARY =====`);
-    console.log(`[TimeExtract] All times found:`, timeValues);
-    console.log(`[TimeExtract] All decimal hours:`, numberValues);
-    console.log(`[TimeExtract] All durations:`, durationValues);
-
-    // Filter out duration times from clock times
-    // Remove any time value that's under 12 hours (likely a duration, not a clock time)
-    const clockTimes = timeValues.filter(t => {
-      const [h] = t.split(':').map(Number);
-      return h >= 6; // Clock times are typically 6:00 or later
-    });
-
-    console.log(`[TimeExtract] Filtered clock times:`, clockTimes);
-
-    // In RTL Excel: last time column = entry (כניסה), second to last = exit (יציאה)
-    // Or: first time = entry, second time = exit (chronological order)
-    if (clockTimes.length >= 2) {
-      // Try to determine which is entry and which is exit
-      // Usually entry < exit, but not always due to column order
-      startTime = clockTimes[clockTimes.length - 1]; // Last = entry (כניסה) in RTL
-      endTime = clockTimes[clockTimes.length - 2];   // Second to last = exit (יציאה)
-      
-      // Validate: if startTime > endTime, they might be in wrong order
-      const [sh] = startTime.split(':').map(Number);
-      const [eh] = endTime.split(':').map(Number);
-      if (sh > eh && eh < 6) {
-        // Exit is past midnight (like 01:00), keep as is
-        console.log(`[TimeExtract] Overnight shift detected`);
-      } else if (sh > eh) {
-        // Likely wrong order, swap them
-        [startTime, endTime] = [endTime, startTime];
-        console.log(`[TimeExtract] Swapped order (was backwards)`);
-      }
-      
-      console.log(`[TimeExtract] ✅ Assigned times: ${startTime} → ${endTime}`);
-    } else if (clockTimes.length === 1) {
-      startTime = clockTimes[0];
-      console.log(`[TimeExtract] ⚠️ Only one time found: ${startTime}`);
-    } else {
-      console.log(`[TimeExtract] ❌ No clock times found! All values:`, timeValues);
+    // Get decimal hours from column 6 (150% column - most reliable)
+    const decimalHours = parseFloat(row[6]);
+    if (!isNaN(decimalHours) && decimalHours > 0) {
+      totalHours = decimalHours;
+      console.log(`[TimeExtract] ✅ Total hours: ${totalHours}`);
     }
 
-    // Total hours - prefer decimal values (like 5.96), then duration H:MM values
-    if (numberValues.length > 0) {
-      totalHours = Math.max(...numberValues);
-      console.log(`[TimeExtract] Using decimal hours: ${totalHours}`);
-    }
-
-    // If no decimal number found, use the smallest duration value
-    // (the total hours column is usually the smallest H:MM value)
-    if (totalHours === 0 && durationValues.length > 0) {
-      // The duration is usually the value that doesn't match start/end times
-      const startHours = startTime ? parseInt(startTime.split(':')[0]) + parseInt(startTime.split(':')[1]) / 60 : -1;
-      const endHours = endTime ? parseInt(endTime.split(':')[0]) + parseInt(endTime.split(':')[1]) / 60 : -1;
-      
-      for (const dur of durationValues) {
-        // Skip values that match start or end times (within 0.1h tolerance)
-        if (Math.abs(dur - startHours) < 0.1) continue;
-        if (Math.abs(dur - endHours) < 0.1) continue;
-        // Pick the first non-clock-time duration
-        if (dur > 0 && dur < 15) {
-          totalHours = dur;
-          console.log(`[TimeExtract] Using duration value: ${totalHours}`);
-          break;
-        }
-      }
-    }
-
-    // If still no hours, try to calculate from start/end times
+    // If no decimal hours but we have times, calculate from entry/exit times
     if (totalHours === 0 && startTime && endTime) {
       const [sh, sm] = startTime.split(':').map(Number);
       const [eh, em] = endTime.split(':').map(Number);
-      let diff = (eh - sh) + (em - sm) / 60;
-      if (diff < 0) diff += 24;
-      totalHours = diff;
+      let startMins = sh * 60 + sm;
+      let endMins = eh * 60 + em;
+      
+      // Handle overnight shifts (exit time < entry time means past midnight)
+      if (endMins < startMins) {
+        endMins += 24 * 60;
+        console.log(`[TimeExtract] Overnight shift detected`);
+      }
+      
+      totalHours = Math.round((endMins - startMins) / 60 * 100) / 100;
       console.log(`[TimeExtract] Calculated hours from times: ${totalHours}`);
     }
 
-    if (totalHours === 0) {
-      console.log(`[TimeExtract] ❌ No hours found, returning null`);
+    // Only return shift if we have VALID COMPLETE data
+    if (!startTime || !endTime || totalHours === 0) {
+      console.log(`[TimeExtract] ❌ Incomplete data (start:${startTime}, end:${endTime}, hours:${totalHours}) - SKIPPING`);
       return null;
     }
 
@@ -1324,7 +1252,8 @@ export class HoursImportService {
       startTime,
       endTime,
     };
-    console.log(`[TimeExtract] ✅ Final shift:`, result);
+    
+    console.log(`[TimeExtract] ✅ COMPLETE SHIFT:`, result);
     return result;
   }
 
