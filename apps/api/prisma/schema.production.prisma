@@ -99,6 +99,7 @@ model BusinessSettings {
   closedPeriods          Json?    @default("[]") @map("closed_periods")
   defaultHourlyWage      Float    @default(30) @map("default_hourly_wage")
   defaultWages           Json?    @default("{}") @map("default_wages")
+  shiftRequirements      Json?    @default("{}") @map("shift_requirements")
   createdAt              DateTime @default(now()) @map("created_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

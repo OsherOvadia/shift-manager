@@ -35,4 +35,11 @@ export class UpdateSettingsDto {
   @IsObject()
   @IsOptional()
   defaultWages?: { [categoryName: string]: number }; // e.g. { waiter: 30, cook: 35, sushi: 40 }
+
+  @IsObject()
+  @IsOptional()
+  shiftRequirements?: {
+    FULL_TIME?: { minShifts: number; minWeekendShifts: number };
+    PART_TIME?: { minShifts: number; minWeekendShifts: number };
+  };
 }

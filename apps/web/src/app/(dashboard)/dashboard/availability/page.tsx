@@ -46,22 +46,15 @@ export default function AvailabilityPage() {
     enabled: !!accessToken,
   })
 
-  // Update weekend days and closed periods when settings are loaded
+  // Update weekend days, closed periods, and shift requirements when settings are loaded
   useEffect(() => {
     if (settings?.weekendDays) {
-      console.log('📅 Loaded weekend days from settings:', settings.weekendDays)
       setWeekendDays(settings.weekendDays)
     }
     if (settings?.closedPeriods) {
-      console.log('🚫 Loaded closed periods from settings:', settings.closedPeriods)
       setClosedPeriods(settings.closedPeriods)
     }
   }, [settings])
-
-  // Debug: Log current weekend days
-  useEffect(() => {
-    console.log('🔍 Current weekendDays state:', weekendDays)
-  }, [weekendDays])
 
   const { data: existingSubmission, isLoading } = useQuery({
     queryKey: ['availability', targetWeekStart.toISOString()],
@@ -169,19 +162,22 @@ export default function AvailabilityPage() {
   }
 
   const getMinShifts = () => {
-    return user?.employmentType === 'FULL_TIME' ? 5 : 3
+    const type = user?.employmentType === 'FULL_TIME' ? 'FULL_TIME' : 'PART_TIME'
+    const reqs = settings?.shiftRequirements?.[type]
+    if (reqs?.minShifts !== undefined) return reqs.minShifts
+    return type === 'FULL_TIME' ? 5 : 3
   }
 
   const getMinWeekendShifts = () => {
-    return user?.employmentType === 'FULL_TIME' ? 2 : 1
+    const type = user?.employmentType === 'FULL_TIME' ? 'FULL_TIME' : 'PART_TIME'
+    const reqs = settings?.shiftRequirements?.[type]
+    if (reqs?.minWeekendShifts !== undefined) return reqs.minWeekendShifts
+    return type === 'FULL_TIME' ? 2 : 1
   }
 
   const weekendSlots = Array.from(selectedSlots.values()).filter((slot) => {
-    const date = parseLocalDate(slot.shiftDate) // Parse as local date
-    const dayOfWeek = date.getDay()
-    const isWeekendDay = isWeekend(date, weekendDays)
-    console.log('🗓️ Slot date:', slot.shiftDate, 'Day:', dayOfWeek, 'Is weekend?', isWeekendDay, 'Weekend days:', weekendDays)
-    return isWeekendDay
+    const date = parseLocalDate(slot.shiftDate)
+    return isWeekend(date, weekendDays)
   }).length
 
   const isValid = selectedSlots.size >= getMinShifts() && weekendSlots >= getMinWeekendShifts()

@@ -55,6 +55,16 @@ interface DefaultWages {
   [key: string]: number
 }
 
+interface ShiftRules {
+  minShifts: number
+  minWeekendShifts: number
+}
+
+interface ShiftRequirements {
+  FULL_TIME: ShiftRules
+  PART_TIME: ShiftRules
+}
+
 interface SettingsFormData {
   weekendDays: number[]
   submissionDeadlineDay: number
@@ -62,6 +72,7 @@ interface SettingsFormData {
   closedPeriods: ClosedPeriod[]
   defaultHourlyWage: number
   defaultWages: DefaultWages
+  shiftRequirements: ShiftRequirements
 }
 
 export default function SettingsPage() {
@@ -92,6 +103,10 @@ export default function SettingsPage() {
       closedPeriods: [],
       defaultHourlyWage: 30,
       defaultWages: { waiter: 30, cook: 35, sushi: 40, dishwasher: 28 },
+      shiftRequirements: {
+        FULL_TIME: { minShifts: 5, minWeekendShifts: 2 },
+        PART_TIME: { minShifts: 3, minWeekendShifts: 1 },
+      },
     },
   })
 
@@ -112,6 +127,16 @@ export default function SettingsPage() {
           sushi: settings.defaultWages?.sushi ?? 40,
           dishwasher: settings.defaultWages?.dishwasher ?? 28,
           ...settings.defaultWages,
+        },
+        shiftRequirements: {
+          FULL_TIME: {
+            minShifts: settings.shiftRequirements?.FULL_TIME?.minShifts ?? 5,
+            minWeekendShifts: settings.shiftRequirements?.FULL_TIME?.minWeekendShifts ?? 2,
+          },
+          PART_TIME: {
+            minShifts: settings.shiftRequirements?.PART_TIME?.minShifts ?? 3,
+            minWeekendShifts: settings.shiftRequirements?.PART_TIME?.minWeekendShifts ?? 1,
+          },
         },
       })
     }
@@ -234,6 +259,81 @@ export default function SettingsPage() {
                     </Label>
                   </div>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Shift Requirements */}
+          <Card>
+            <CardHeader>
+              <CardTitle>דרישות הגשת משמרות</CardTitle>
+              <CardDescription>
+                מספר משמרות מינימלי שכל עובד צריך להגיש לפי סוג משרה
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Full Time */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                    משרה מלאה
+                  </Label>
+                  <div className="grid gap-4 sm:grid-cols-2 mr-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-sm text-muted-foreground">מינימום משמרות בשבוע</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={21}
+                        {...register('shiftRequirements.FULL_TIME.minShifts', { valueAsNumber: true })}
+                        className="h-10"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm text-muted-foreground">מינימום משמרות סוף שבוע</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={10}
+                        {...register('shiftRequirements.FULL_TIME.minWeekendShifts', { valueAsNumber: true })}
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t" />
+
+                {/* Part Time */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-yellow-500" />
+                    משרה חלקית
+                  </Label>
+                  <div className="grid gap-4 sm:grid-cols-2 mr-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-sm text-muted-foreground">מינימום משמרות בשבוע</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={21}
+                        {...register('shiftRequirements.PART_TIME.minShifts', { valueAsNumber: true })}
+                        className="h-10"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm text-muted-foreground">מינימום משמרות סוף שבוע</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={10}
+                        {...register('shiftRequirements.PART_TIME.minWeekendShifts', { valueAsNumber: true })}
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

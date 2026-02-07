@@ -4,8 +4,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CreateAvailabilityDto } from './dto/create-availability.dto';
 import { UpdateAvailabilityDto } from './dto/update-availability.dto';
 
-// Work rules configuration
-const WORK_RULES: Record<string, { minShifts: number; minWeekendShifts: number }> = {
+// Default work rules (used as fallback if not configured in settings)
+const DEFAULT_WORK_RULES: Record<string, { minShifts: number; minWeekendShifts: number }> = {
   FULL_TIME: { minShifts: 5, minWeekendShifts: 2 },
   PART_TIME: { minShifts: 3, minWeekendShifts: 1 },
 };
@@ -60,9 +60,11 @@ export class AvailabilityService {
 
     const weekStartDate = this.normalizeToWeekStart(new Date(createDto.weekStartDate));
 
-    // Validate against work rules
+    // Validate against work rules (use DB settings if available, fallback to defaults)
     const weekendDays = parseWeekendDays(user.organization.businessSettings?.weekendDays ?? null);
-    const validation = this.validateSubmission(createDto.slots, user.employmentType, weekendDays);
+    const shiftRequirements = (user.organization.businessSettings as any)?.shiftRequirements || {};
+    const workRules = this.getWorkRules(shiftRequirements);
+    const validation = this.validateSubmission(createDto.slots, user.employmentType, weekendDays, workRules);
 
     if (!validation.valid) {
       throw new BadRequestException({
@@ -168,10 +170,13 @@ export class AvailabilityService {
       });
 
       const weekendDays = parseWeekendDays(user!.organization.businessSettings?.weekendDays ?? null);
+      const shiftRequirements = (user!.organization.businessSettings as any)?.shiftRequirements || {};
+      const workRules = this.getWorkRules(shiftRequirements);
       const validation = this.validateSubmission(
         updateDto.slots,
         user!.employmentType,
         weekendDays,
+        workRules,
       );
 
       if (!validation.valid) {
@@ -333,12 +338,29 @@ export class AvailabilityService {
     return d;
   }
 
+  /**
+   * Merge DB-stored shift requirements with defaults.
+   */
+  private getWorkRules(shiftRequirements: any): Record<string, { minShifts: number; minWeekendShifts: number }> {
+    return {
+      FULL_TIME: {
+        minShifts: shiftRequirements?.FULL_TIME?.minShifts ?? DEFAULT_WORK_RULES.FULL_TIME.minShifts,
+        minWeekendShifts: shiftRequirements?.FULL_TIME?.minWeekendShifts ?? DEFAULT_WORK_RULES.FULL_TIME.minWeekendShifts,
+      },
+      PART_TIME: {
+        minShifts: shiftRequirements?.PART_TIME?.minShifts ?? DEFAULT_WORK_RULES.PART_TIME.minShifts,
+        minWeekendShifts: shiftRequirements?.PART_TIME?.minWeekendShifts ?? DEFAULT_WORK_RULES.PART_TIME.minWeekendShifts,
+      },
+    };
+  }
+
   private validateSubmission(
     slots: { shiftDate: string; shiftType: string; preferenceRank?: number }[],
     employmentType: string,
     weekendDays: number[],
+    workRules: Record<string, { minShifts: number; minWeekendShifts: number }>,
   ) {
-    const rules = WORK_RULES[employmentType];
+    const rules = workRules[employmentType] || DEFAULT_WORK_RULES[employmentType];
     const violations: { type: string; message: string }[] = [];
 
     const totalShifts = slots.length;

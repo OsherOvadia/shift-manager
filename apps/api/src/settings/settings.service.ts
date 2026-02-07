@@ -74,6 +74,9 @@ export class SettingsService {
     if (updateDto.defaultWages !== undefined) {
       dataToSave.defaultWages = updateDto.defaultWages;
     }
+    if (updateDto.shiftRequirements !== undefined) {
+      dataToSave.shiftRequirements = updateDto.shiftRequirements;
+    }
 
     if (!settings) {
       // Create with provided values
