@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/use-toast'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
-import { getWeekStartDate, getWeekDates, getDayName, formatShortDate } from '@/lib/utils'
+import { getWeekStartDate, getWeekDates, getDayLetter, formatShortDate } from '@/lib/utils'
 import { Loader2, ChevronRight, ChevronLeft, Check, X, AlertTriangle } from 'lucide-react'
 
 const SHIFT_TYPES = [
@@ -333,7 +333,7 @@ function SubmissionCard({
             const slots = getSlotsForDate(date)
             return (
               <div key={date.toISOString()} className="space-y-1">
-                <div className="font-medium text-xs">{getDayName(date).slice(0, 3)}</div>
+                <div className="font-medium text-xs">{getDayLetter(date)}</div>
                 {slots.length > 0 ? (
                   slots.map((slot: any) => (
                     <Badge
