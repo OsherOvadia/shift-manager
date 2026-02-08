@@ -17,6 +17,7 @@ import { DatabaseResetModule } from './database/database-reset.module';
 import { CookPayrollModule } from './cook-payroll/cook-payroll.module';
 import { MonthlyExpensesModule } from './monthly-expenses/monthly-expenses.module';
 import { HoursImportModule } from './hours-import/hours-import.module';
+import { SuperAdminModule } from './super-admin/super-admin.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { HoursImportModule } from './hours-import/hours-import.module';
     CookPayrollModule,
     MonthlyExpensesModule,
     HoursImportModule,
+    SuperAdminModule,
   ],
 })
 export class AppModule {}

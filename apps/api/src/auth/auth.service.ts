@@ -33,8 +33,22 @@ export class AuthService {
       throw new UnauthorizedException('שם משתמש או סיסמה שגויים');
     }
 
-    if (!user.isApproved) {
+    // Skip approval check for SUPER_ADMIN
+    if (user.role !== 'SUPER_ADMIN' && !user.isApproved) {
       throw new UnauthorizedException('החשבון שלך ממתין לאישור מנהל');
+    }
+
+    // Check organization status for non-super-admin users
+    if (user.role !== 'SUPER_ADMIN' && user.organization) {
+      if (user.organization.status === 'SUSPENDED') {
+        throw new UnauthorizedException('הארגון שלך הושעה. אנא צור קשר עם התמיכה');
+      }
+      if (user.organization.status === 'PENDING') {
+        throw new UnauthorizedException('הארגון שלך ממתין לאישור');
+      }
+      if (user.organization.status === 'REJECTED') {
+        throw new UnauthorizedException('בקשת הארגון נדחתה');
+      }
     }
 
     const bcryptStartTime = Date.now();
@@ -235,8 +249,11 @@ export class AuthService {
   }
 
   async getOrganizations() {
-    // Return list of organizations for signup form
+    // Return list of APPROVED organizations for signup form
     return this.prisma.organization.findMany({
+      where: {
+        status: 'APPROVED',
+      },
       select: {
         id: true,
         name: true,

@@ -61,8 +61,8 @@ export class AvailabilityService {
     const weekStartDate = this.normalizeToWeekStart(new Date(createDto.weekStartDate));
 
     // Validate against work rules (use DB settings if available, fallback to defaults)
-    const weekendDays = parseWeekendDays(user.organization.businessSettings?.weekendDays ?? null);
-    const shiftRequirements = (user.organization.businessSettings as any)?.shiftRequirements || {};
+    const weekendDays = parseWeekendDays(user.organization?.businessSettings?.weekendDays ?? null);
+    const shiftRequirements = (user.organization?.businessSettings as any)?.shiftRequirements || {};
     const workRules = this.getWorkRules(shiftRequirements);
     const validation = this.validateSubmission(createDto.slots, user.employmentType, weekendDays, workRules);
 
@@ -169,8 +169,8 @@ export class AvailabilityService {
         },
       });
 
-      const weekendDays = parseWeekendDays(user!.organization.businessSettings?.weekendDays ?? null);
-      const shiftRequirements = (user!.organization.businessSettings as any)?.shiftRequirements || {};
+      const weekendDays = parseWeekendDays(user!.organization?.businessSettings?.weekendDays ?? null);
+      const shiftRequirements = (user!.organization?.businessSettings as any)?.shiftRequirements || {};
       const workRules = this.getWorkRules(shiftRequirements);
       const validation = this.validateSubmission(
         updateDto.slots,

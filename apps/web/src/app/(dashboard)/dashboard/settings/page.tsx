@@ -74,6 +74,25 @@ interface SettingsFormData {
   defaultWages: DefaultWages
   shiftRequirements: ShiftRequirements
   enabledShiftTypes: string[]
+  // Feature Toggles
+  enableAvailabilitySubmission: boolean
+  requireShiftApproval: boolean
+  enableTipTracking: boolean
+  enableCashTipTracking: boolean
+  enableRevenueBreakdown: boolean
+  enableDailyRevenue: boolean
+  enableFinancialReports: boolean
+  enableMonthlyOverview: boolean
+  enableCookPayroll: boolean
+  enableExcelImport: boolean
+  enableNotifications: boolean
+  enableEmailNotifications: boolean
+  enableJobCategories: boolean
+  enableKitchenStaffSeparation: boolean
+  enableMonthlyExpenses: boolean
+  enableAutomaticScheduling: boolean
+  enableShiftSwapping: boolean
+  enableOvertimeTracking: boolean
 }
 
 const ALL_SHIFT_TYPES = [
@@ -115,6 +134,24 @@ export default function SettingsPage() {
         PART_TIME: { minShifts: 3, minWeekendShifts: 1 },
       },
       enabledShiftTypes: ['MORNING', 'EVENING'],
+      enableAvailabilitySubmission: true,
+      requireShiftApproval: false,
+      enableTipTracking: true,
+      enableCashTipTracking: true,
+      enableRevenueBreakdown: true,
+      enableDailyRevenue: true,
+      enableFinancialReports: true,
+      enableMonthlyOverview: true,
+      enableCookPayroll: true,
+      enableExcelImport: true,
+      enableNotifications: true,
+      enableEmailNotifications: false,
+      enableJobCategories: true,
+      enableKitchenStaffSeparation: true,
+      enableMonthlyExpenses: true,
+      enableAutomaticScheduling: false,
+      enableShiftSwapping: false,
+      enableOvertimeTracking: false,
     },
   })
 
@@ -149,6 +186,24 @@ export default function SettingsPage() {
           },
         },
         enabledShiftTypes: settings.enabledShiftTypes || ['MORNING', 'EVENING'],
+        enableAvailabilitySubmission: settings.enableAvailabilitySubmission ?? true,
+        requireShiftApproval: settings.requireShiftApproval ?? false,
+        enableTipTracking: settings.enableTipTracking ?? true,
+        enableCashTipTracking: settings.enableCashTipTracking ?? true,
+        enableRevenueBreakdown: settings.enableRevenueBreakdown ?? true,
+        enableDailyRevenue: settings.enableDailyRevenue ?? true,
+        enableFinancialReports: settings.enableFinancialReports ?? true,
+        enableMonthlyOverview: settings.enableMonthlyOverview ?? true,
+        enableCookPayroll: settings.enableCookPayroll ?? true,
+        enableExcelImport: settings.enableExcelImport ?? true,
+        enableNotifications: settings.enableNotifications ?? true,
+        enableEmailNotifications: settings.enableEmailNotifications ?? false,
+        enableJobCategories: settings.enableJobCategories ?? true,
+        enableKitchenStaffSeparation: settings.enableKitchenStaffSeparation ?? true,
+        enableMonthlyExpenses: settings.enableMonthlyExpenses ?? true,
+        enableAutomaticScheduling: settings.enableAutomaticScheduling ?? false,
+        enableShiftSwapping: settings.enableShiftSwapping ?? false,
+        enableOvertimeTracking: settings.enableOvertimeTracking ?? false,
       })
     }
   }, [settings, reset])
@@ -577,6 +632,242 @@ export default function SettingsPage() {
                 </div>
                 <div className="text-xs text-muted-foreground pt-2 border-t">
                   משמרות סגורות לא יוצגו בהגשת זמינות ובניהול לוח המשמרות
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Feature Toggles */}
+          <Card>
+            <CardHeader>
+              <CardTitle>תכונות מערכת</CardTitle>
+              <CardDescription>
+                הפעל או כבה תכונות לפי הצורך של הארגון שלך
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Availability & Scheduling */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm">זמינות ותזמון משמרות</h3>
+                  <div className="space-y-2 mr-4">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableAvailabilitySubmission"
+                        checked={watch('enableAvailabilitySubmission') ?? true}
+                        onCheckedChange={(checked) => setValue('enableAvailabilitySubmission', !!checked)}
+                      />
+                      <Label htmlFor="enableAvailabilitySubmission" className="cursor-pointer">
+                        הגשת זמינות עובדים
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="requireShiftApproval"
+                        checked={watch('requireShiftApproval') ?? false}
+                        onCheckedChange={(checked) => setValue('requireShiftApproval', !!checked)}
+                      />
+                      <Label htmlFor="requireShiftApproval" className="cursor-pointer">
+                        נדרש אישור מנהל למשמרות
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableAutomaticScheduling"
+                        checked={watch('enableAutomaticScheduling') ?? false}
+                        onCheckedChange={(checked) => setValue('enableAutomaticScheduling', !!checked)}
+                      />
+                      <Label htmlFor="enableAutomaticScheduling" className="cursor-pointer">
+                        תזמון אוטומטי של משמרות (בפיתוח)
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableShiftSwapping"
+                        checked={watch('enableShiftSwapping') ?? false}
+                        onCheckedChange={(checked) => setValue('enableShiftSwapping', !!checked)}
+                      />
+                      <Label htmlFor="enableShiftSwapping" className="cursor-pointer">
+                        החלפת משמרות בין עובדים (בפיתוח)
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t" />
+
+                {/* Tips & Revenue */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm">טיפים והכנסות</h3>
+                  <div className="space-y-2 mr-4">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableTipTracking"
+                        checked={watch('enableTipTracking') ?? true}
+                        onCheckedChange={(checked) => setValue('enableTipTracking', !!checked)}
+                      />
+                      <Label htmlFor="enableTipTracking" className="cursor-pointer">
+                        מעקב אחר טיפים
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableCashTipTracking"
+                        checked={watch('enableCashTipTracking') ?? true}
+                        onCheckedChange={(checked) => setValue('enableCashTipTracking', !!checked)}
+                      />
+                      <Label htmlFor="enableCashTipTracking" className="cursor-pointer">
+                        מעקב אחר טיפים במזומן למלצרים
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableRevenueBreakdown"
+                        checked={watch('enableRevenueBreakdown') ?? true}
+                        onCheckedChange={(checked) => setValue('enableRevenueBreakdown', !!checked)}
+                      />
+                      <Label htmlFor="enableRevenueBreakdown" className="cursor-pointer">
+                        פירוט הכנסות (ישיבה/טייק-אווי/משלוחים)
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableDailyRevenue"
+                        checked={watch('enableDailyRevenue') ?? true}
+                        onCheckedChange={(checked) => setValue('enableDailyRevenue', !!checked)}
+                      />
+                      <Label htmlFor="enableDailyRevenue" className="cursor-pointer">
+                        דיווח הכנסות יומי
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t" />
+
+                {/* Reports & Analytics */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm">דוחות וניתוח</h3>
+                  <div className="space-y-2 mr-4">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableFinancialReports"
+                        checked={watch('enableFinancialReports') ?? true}
+                        onCheckedChange={(checked) => setValue('enableFinancialReports', !!checked)}
+                      />
+                      <Label htmlFor="enableFinancialReports" className="cursor-pointer">
+                        דוחות כספיים
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableMonthlyOverview"
+                        checked={watch('enableMonthlyOverview') ?? true}
+                        onCheckedChange={(checked) => setValue('enableMonthlyOverview', !!checked)}
+                      />
+                      <Label htmlFor="enableMonthlyOverview" className="cursor-pointer">
+                        סיכום חודשי
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableCookPayroll"
+                        checked={watch('enableCookPayroll') ?? true}
+                        onCheckedChange={(checked) => setValue('enableCookPayroll', !!checked)}
+                      />
+                      <Label htmlFor="enableCookPayroll" className="cursor-pointer">
+                        שכר טבחים
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableMonthlyExpenses"
+                        checked={watch('enableMonthlyExpenses') ?? true}
+                        onCheckedChange={(checked) => setValue('enableMonthlyExpenses', !!checked)}
+                      />
+                      <Label htmlFor="enableMonthlyExpenses" className="cursor-pointer">
+                        הוצאות חודשיות
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableOvertimeTracking"
+                        checked={watch('enableOvertimeTracking') ?? false}
+                        onCheckedChange={(checked) => setValue('enableOvertimeTracking', !!checked)}
+                      />
+                      <Label htmlFor="enableOvertimeTracking" className="cursor-pointer">
+                        מעקב שעות נוספות (בפיתוח)
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t" />
+
+                {/* Import & Categories */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm">ייבוא נתונים וקטגוריות</h3>
+                  <div className="space-y-2 mr-4">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableExcelImport"
+                        checked={watch('enableExcelImport') ?? true}
+                        onCheckedChange={(checked) => setValue('enableExcelImport', !!checked)}
+                      />
+                      <Label htmlFor="enableExcelImport" className="cursor-pointer">
+                        ייבוא שעות מאקסל
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableJobCategories"
+                        checked={watch('enableJobCategories') ?? true}
+                        onCheckedChange={(checked) => setValue('enableJobCategories', !!checked)}
+                      />
+                      <Label htmlFor="enableJobCategories" className="cursor-pointer">
+                        קטגוריות תפקידים
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableKitchenStaffSeparation"
+                        checked={watch('enableKitchenStaffSeparation') ?? true}
+                        onCheckedChange={(checked) => setValue('enableKitchenStaffSeparation', !!checked)}
+                      />
+                      <Label htmlFor="enableKitchenStaffSeparation" className="cursor-pointer">
+                        הפרדת צוות מטבח בלוח משמרות
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t" />
+
+                {/* Notifications */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm">התראות</h3>
+                  <div className="space-y-2 mr-4">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableNotifications"
+                        checked={watch('enableNotifications') ?? true}
+                        onCheckedChange={(checked) => setValue('enableNotifications', !!checked)}
+                      />
+                      <Label htmlFor="enableNotifications" className="cursor-pointer">
+                        התראות במערכת
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="enableEmailNotifications"
+                        checked={watch('enableEmailNotifications') ?? false}
+                        onCheckedChange={(checked) => setValue('enableEmailNotifications', !!checked)}
+                      />
+                      <Label htmlFor="enableEmailNotifications" className="cursor-pointer">
+                        שליחת התראות במייל (בפיתוח)
+                      </Label>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>

@@ -12,9 +12,10 @@ datasource db {
 }
 
 enum Role {
-  ADMIN
-  MANAGER
-  EMPLOYEE
+  SUPER_ADMIN  // Platform super admin - manages all organizations
+  ADMIN        // Organization admin
+  MANAGER      // Organization manager
+  EMPLOYEE     // Regular employee
 }
 
 enum EmploymentType {
@@ -56,11 +57,24 @@ enum NotificationType {
   RULE_VIOLATION
 }
 
+enum OrganizationStatus {
+  PENDING    // Awaiting super admin approval
+  APPROVED   // Approved and active
+  SUSPENDED  // Suspended by super admin
+  REJECTED   // Registration rejected
+}
+
 model Organization {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  timezone  String   @default("Asia/Jerusalem")
-  createdAt DateTime @default(now()) @map("created_at")
+  id          String             @id @default(uuid())
+  name        String             @unique
+  status      OrganizationStatus @default(PENDING)
+  timezone    String             @default("Asia/Jerusalem")
+  contactEmail String?           @map("contact_email")
+  contactPhone String?           @map("contact_phone")
+  approvedAt  DateTime?          @map("approved_at")
+  approvedBy  String?            @map("approved_by") // Super admin user ID who approved
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
 
   users            User[]
   shiftTemplates   ShiftTemplate[]
@@ -70,6 +84,7 @@ model Organization {
   cookWeeklyHours  CookWeeklyHours[]
   monthlyExpenses  MonthlyExpenses[]
 
+  @@index([status])
   @@map("organizations")
 }
 
@@ -93,15 +108,51 @@ model JobCategory {
 model BusinessSettings {
   id                     String   @id @default(uuid())
   organizationId         String   @unique @map("organization_id")
+  
+  // Schedule & Time Management
   weekendDays            Int[]    @default([5, 6]) @map("weekend_days")
   submissionDeadlineDay  Int      @default(4) @map("submission_deadline_day")
   submissionDeadlineHour Int      @default(18) @map("submission_deadline_hour")
   closedPeriods          Json?    @default("[]") @map("closed_periods")
+  enabledShiftTypes      Json?    @default("[\"MORNING\",\"EVENING\"]") @map("enabled_shift_types")
+  
+  // Wage & Payment Settings
   defaultHourlyWage      Float    @default(30) @map("default_hourly_wage")
   defaultWages           Json?    @default("{}") @map("default_wages")
   shiftRequirements      Json?    @default("{}") @map("shift_requirements")
-  enabledShiftTypes      Json?    @default("[\"MORNING\",\"EVENING\"]") @map("enabled_shift_types")
+  
+  // Feature Toggles - Availability System
+  enableAvailabilitySubmission Boolean @default(true) @map("enable_availability_submission")
+  requireShiftApproval         Boolean @default(false) @map("require_shift_approval")
+  
+  // Feature Toggles - Tips & Revenue
+  enableTipTracking            Boolean @default(true) @map("enable_tip_tracking")
+  enableCashTipTracking        Boolean @default(true) @map("enable_cash_tip_tracking")
+  enableRevenueBreakdown       Boolean @default(true) @map("enable_revenue_breakdown") // sitting/takeaway/delivery
+  enableDailyRevenue           Boolean @default(true) @map("enable_daily_revenue")
+  
+  // Feature Toggles - Reports & Analytics
+  enableFinancialReports       Boolean @default(true) @map("enable_financial_reports")
+  enableMonthlyOverview        Boolean @default(true) @map("enable_monthly_overview")
+  enableCookPayroll            Boolean @default(true) @map("enable_cook_payroll")
+  enableExcelImport            Boolean @default(true) @map("enable_excel_import")
+  
+  // Feature Toggles - Notifications
+  enableNotifications          Boolean @default(true) @map("enable_notifications")
+  enableEmailNotifications     Boolean @default(false) @map("enable_email_notifications")
+  
+  // Feature Toggles - Job Categories
+  enableJobCategories          Boolean @default(true) @map("enable_job_categories")
+  enableKitchenStaffSeparation Boolean @default(true) @map("enable_kitchen_staff_separation")
+  
+  // Feature Toggles - Advanced Features
+  enableMonthlyExpenses        Boolean @default(true) @map("enable_monthly_expenses")
+  enableAutomaticScheduling    Boolean @default(false) @map("enable_automatic_scheduling")
+  enableShiftSwapping          Boolean @default(false) @map("enable_shift_swapping")
+  enableOvertimeTracking       Boolean @default(false) @map("enable_overtime_tracking")
+  
   createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -116,7 +167,7 @@ model User {
   lastName       String         @map("last_name")
   role           Role           @default(EMPLOYEE)
   employmentType EmploymentType @default(FULL_TIME) @map("employment_type")
-  organizationId String         @map("organization_id")
+  organizationId String?        @map("organization_id") // Nullable for SUPER_ADMIN users
   jobCategoryId  String?        @map("job_category_id")
   hourlyWage     Float          @default(0) @map("hourly_wage")
   baseHourlyWage Float?         @map("base_hourly_wage") // For tip-based employees (waiters)
@@ -125,7 +176,7 @@ model User {
   isApproved     Boolean        @default(false) @map("is_approved")
   createdAt      DateTime       @default(now()) @map("created_at")
 
-  organization            Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization            Organization?            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   jobCategory             JobCategory?             @relation(fields: [jobCategoryId], references: [id])
   availabilitySubmissions AvailabilitySubmission[]
   shiftAssignments        ShiftAssignment[]
@@ -136,6 +187,7 @@ model User {
   @@index([organizationId])
   @@index([email])
   @@index([jobCategoryId])
+  @@index([role])
   @@map("users")
 }
 
